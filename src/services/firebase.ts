@@ -6,13 +6,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // Remplace ces valeurs par celles de ta console Firebase :
 // https://console.firebase.google.com -> ton projet -> Paramètres -> Config web
 const firebaseConfig = {
-  apiKey:            "REPLACE_WITH_YOUR_API_KEY",
-    authDomain:        "REPLACE_WITH_YOUR_AUTH_DOMAIN",
-      projectId:         "REPLACE_WITH_YOUR_PROJECT_ID",
-        storageBucket:     "REPLACE_WITH_YOUR_STORAGE_BUCKET",
-          messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
-            appId:             "REPLACE_WITH_YOUR_APP_ID",
-            };
+  apiKey:            "AIzaSyCHTHN6P_drQxCehbhtVqmWrge9Ell76Cw",
+  authDomain:        "studyai-82cd7.firebaseapp.com",
+  projectId:         "studyai-82cd7",
+  storageBucket:     "studyai-82cd7.firebasestorage.app",
+  messagingSenderId: "369068414875",
+  appId:             "1:369068414875:web:151f86bc91d29383eaf33e",
+};
 
             // Evite d'initialiser Firebase deux fois en cas de hot-reload
             const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
