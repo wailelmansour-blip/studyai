@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidString(field, maxLen) {
+      return field is string && field.size() > 0 && field.size() <= maxLen;
+    }
+
+    function isValidTimestamp(field) {
+      return field is timestamp;
+    }
+
+    // ── users/{userId} ───────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && isValidString(request.resource.data.name, 100)
+        && isValidString(request.resource.data.email, 200);
+      allow update: if isOwner(userId)
+        && request.resource.data.id == userId;
+      allow delete: if false;
+
+      // ── notes/{noteId} ────────────────────────────────────────
+      match /notes/{noteId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidString(request.resource.data.content, 10000);
+        allow update: if isOwner(userId)
+          && isValidString(request.resource.data.content, 10000);
+        allow delete: if isOwner(userId);
+
+        // ── files/{fileId} ──────────────────────────────────────
+        match /files/{fileId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && isValidString(request.resource.data.name, 255)
+            && isValidString(request.resource.data.url, 2000)
+            && isValidString(request.resource.data.storagePath, 2000)
+            && request.resource.data.size is number
+            && request.resource.data.size > 0
+            && request.resource.data.size <= 52428800; // 50 MB max
+          allow delete: if isOwner(userId);
+          allow update: if false;
+        }
+      }
+
+      // ── summaries/{summaryId} ─────────────────────────────────
+      match /summaries/{summaryId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidString(request.resource.data.originalText, 50000)
+          && isValidString(request.resource.data.summary, 50000);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── quizzes/{quizId} ──────────────────────────────────────
+      match /quizzes/{quizId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.questions is list
+          && request.resource.data.questions.size() > 0
+          && request.resource.data.questions.size() <= 50;
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── plans/{planId} ────────────────────────────────────────
+      match /plans/{planId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidString(request.resource.data.plan, 50000)
+          && request.resource.data.subjects is list;
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
