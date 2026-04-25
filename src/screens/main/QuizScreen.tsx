@@ -1,206 +1,160 @@
 import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  TextInput, ActivityIndicator, Alert,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Card } from "../../components";
+import { useAuthStore } from "../../store/authStore";
+import { callGenerateQuiz, QuizQuestion } from "../../services/functionsService";
+import { createQuiz, saveQuizScore } from "../../services/quizzesService";
 
-const QUIZ_MODES = [
-  {
-    id: "quick",
-    title: "Quick Quiz",
-    description: "10 questions · ~5 mins",
-    icon: "flash-outline" as const,
-    color: "#6366f1",
-    badge: "Popular",
-  },
-  {
-    id: "deep",
-    title: "Deep Dive",
-    description: "30 questions · ~15 mins",
-    icon: "layers-outline" as const,
-    color: "#ec4899",
-    badge: null,
-  },
-  {
-    id: "ai",
-    title: "AI Generated",
-    description: "Custom topic · Any length",
-    icon: "sparkles-outline" as const,
-    color: "#10b981",
-    badge: "New",
-  },
-  {
-    id: "challenge",
-    title: "Daily Challenge",
-    description: "Compete with friends",
-    icon: "trophy-outline" as const,
-    color: "#f59e0b",
-    badge: null,
-  },
-];
-
-const RECENT_SCORES = [
-  { subject: "Mathematics", score: 85, date: "Today", color: "#6366f1" },
-  { subject: "Physics", score: 72, date: "Yesterday", color: "#ec4899" },
-  { subject: "Chemistry", score: 91, date: "2 days ago", color: "#10b981" },
-];
+type QuizPhase = "setup" | "playing" | "result";
 
 export const QuizScreen: React.FC = () => {
-  const [selectedMode, setSelectedMode] = useState<string | null>(null);
+  const { user } = useAuthStore();
+
+  const [phase, setPhase]                   = useState<QuizPhase>("setup");
+  const [topic, setTopic]                   = useState("");
+  const [count, setCount]                   = useState(5);
+  const [questions, setQuestions]           = useState<QuizQuestion[]>([]);
+  const [currentIndex, setCurrentIndex]     = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [answers, setAnswers]               = useState<number[]>([]);
+  const [score, setScore]                   = useState(0);
+  const [showAnswer, setShowAnswer]         = useState(false);
+  const [isLoading, setIsLoading]           = useState(false);
+  const [isSaving, setIsSaving]             = useState(false);
+  const [isSaved, setIsSaved]               = useState(false);
+  const [error, setError]                   = useState("");
+  const [quizId, setQuizId]                 = useState<string | null>(null);
+
+  // ── Generate Quiz ──────────────────────────────────────────────
+  const handleGenerate = async () => {
+    if (!user) return;
+    if (!topic.trim()) { setError("Veuillez entrer un sujet."); return; }
+    setError("");
+    setIsLoading(true);
+    try {
+      const result = await callGenerateQuiz(topic.trim(), count);
+      if (!result?.length) throw new Error("Aucune question générée.");
+      setQuestions(result);
+      const id = await createQuiz(user.id, result, topic.trim());
+      setQuizId(id);
+      setCurrentIndex(0);
+      setAnswers([]);
+      setScore(0);
+      setSelectedAnswer(null);
+      setShowAnswer(false);
+      setIsSaved(false);
+      setPhase("playing");
+    } catch (err: any) {
+      const msg = err?.message ?? "Impossible de générer le quiz.";
+      setError(msg);
+      Alert.alert("Erreur", msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ── Select Answer ──────────────────────────────────────────────
+  const handleSelectAnswer = (index: number) => {
+    if (showAnswer) return;
+    setSelectedAnswer(index);
+    setShowAnswer(true);
+    if (index === questions[currentIndex].correct) setScore((s) => s + 1);
+    setAnswers((prev) => [...prev, index]);
+  };
+
+  // ── Next Question ──────────────────────────────────────────────
+  const handleNext = () => {
+    if (currentIndex + 1 >= questions.length) {
+      setPhase("result");
+    } else {
+      setCurrentIndex((i) => i + 1);
+      setSelectedAnswer(null);
+      setShowAnswer(false);
+    }
+  };
+
+  // ── Save Score ─────────────────────────────────────────────────
+  const handleSaveScore = async () => {
+    if (!user || !quizId) return;
+    setIsSaving(true);
+    try {
+      const percent = Math.round((score / questions.length) * 100);
+      await saveQuizScore(user.id, quizId, percent);
+      setIsSaved(true);
+      Alert.alert("Sauvegardé !", `Score de ${percent}% enregistré.`);
+    } catch (err: any) {
+      Alert.alert("Erreur", err?.message ?? "Impossible de sauvegarder.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ── Restart ────────────────────────────────────────────────────
+  const handleRestart = () => {
+    setPhase("setup");
+    setTopic("");
+    setQuestions([]);
+    setCurrentIndex(0);
+    setAnswers([]);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowAnswer(false);
+    setIsSaved(false);
+    setQuizId(null);
+    setError("");
+  };
+
+  // ── Option style ───────────────────────────────────────────────
+  const getOptionStyle = (index: number) => {
+    if (!showAnswer) return {
+      border: selectedAnswer === index ? "border-indigo-500" : "border-slate-700",
+      text: "text-white",
+      icon: null,
+    };
+    const isCorrect = index === questions[currentIndex].correct;
+    const isSelected = index === selectedAnswer;
+    if (isCorrect) return { border: "border-emerald-500", text: "text-emerald-400", icon: "checkmark-circle" as const };
+    if (isSelected) return { border: "border-red-500", text: "text-red-400", icon: "close-circle" as const };
+    return { border: "border-slate-700", text: "text-slate-500", icon: null };
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View className="px-5 pt-4 pb-8">
-          {/* Header */}
-          <View className="mb-6">
-            <Text className="text-white text-2xl font-bold">Quiz</Text>
-            <Text className="text-slate-400 text-sm mt-1">
-              Test your knowledge
-            </Text>
-          </View>
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View className="px-5 pt-4 pb-10">
 
-          {/* Stats row */}
-          <View className="flex-row gap-3 mb-6">
-            {[
-              { label: "Quizzes Done", value: "24", icon: "checkmark-circle-outline" as const, color: "#10b981" },
-              { label: "Avg Score", value: "82%", icon: "stats-chart-outline" as const, color: "#6366f1" },
-              { label: "Best Streak", value: "7", icon: "flame-outline" as const, color: "#f59e0b" },
-            ].map((stat) => (
-              <Card key={stat.label} className="flex-1 items-center py-4">
-                <Ionicons name={stat.icon} size={22} color={stat.color} />
-                <Text className="text-white font-bold text-lg mt-1">
-                  {stat.value}
-                </Text>
-                <Text className="text-slate-500 text-[10px] text-center mt-0.5">
-                  {stat.label}
-                </Text>
-              </Card>
-            ))}
-          </View>
+          {/* ══ SETUP ══ */}
+          {phase === "setup" && (
+            <View>
+              <Text className="text-white text-2xl font-bold mb-1">Quiz IA ✨</Text>
+              <Text className="text-slate-400 text-sm mb-8">
+                Entre un sujet et l'IA génère un quiz personnalisé
+              </Text>
 
-          {/* Quiz Modes */}
-          <Text className="text-white text-lg font-bold mb-4">Choose Mode</Text>
-          <View className="gap-3 mb-8">
-            {QUIZ_MODES.map((mode) => (
-              <TouchableOpacity
-                key={mode.id}
-                onPress={() =>
-                  setSelectedMode(selectedMode === mode.id ? null : mode.id)
-                }
-                activeOpacity={0.8}
-              >
-                <Card
-                  className={`${
-                    selectedMode === mode.id
-                      ? "border-indigo-500"
-                      : "border-slate-700/50"
-                  }`}
-                >
-                  <View className="flex-row items-center gap-4">
-                    <View
-                      className="w-12 h-12 rounded-2xl items-center justify-center"
-                      style={{ backgroundColor: mode.color + "22" }}
-                    >
-                      <Ionicons name={mode.icon} size={24} color={mode.color} />
-                    </View>
-                    <View className="flex-1">
-                      <View className="flex-row items-center gap-2">
-                        <Text className="text-white font-bold">
-                          {mode.title}
-                        </Text>
-                        {mode.badge && (
-                          <View
-                            className="px-2 py-0.5 rounded-full"
-                            style={{ backgroundColor: mode.color + "33" }}
-                          >
-                            <Text
-                              className="text-[10px] font-bold"
-                              style={{ color: mode.color }}
-                            >
-                              {mode.badge}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text className="text-slate-400 text-xs mt-0.5">
-                        {mode.description}
-                      </Text>
-                    </View>
-                    <View
-                      className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                        selectedMode === mode.id
-                          ? "border-indigo-500 bg-indigo-500"
-                          : "border-slate-600"
-                      }`}
-                    >
-                      {selectedMode === mode.id && (
-                        <Ionicons name="checkmark" size={14} color="white" />
-                      )}
-                    </View>
-                  </View>
-                </Card>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Start Button */}
-          <TouchableOpacity
-            className={`py-4 rounded-2xl items-center mb-8 ${
-              selectedMode ? "bg-indigo-500" : "bg-slate-700"
-            }`}
-            disabled={!selectedMode}
-          >
-            <Text
-              className={`font-bold text-base ${
-                selectedMode ? "text-white" : "text-slate-500"
-              }`}
-            >
-              {selectedMode ? "Start Quiz 🚀" : "Select a mode to start"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Recent Scores */}
-          <Text className="text-white text-lg font-bold mb-4">
-            Recent Scores
-          </Text>
-          <View className="gap-3">
-            {RECENT_SCORES.map((score) => (
-              <Card key={score.subject}>
+              {/* Sujet */}
+              <Text className="text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wider">
+                Sujet du quiz
+              </Text>
+              <Card className={`mb-3 ${error ? "border-red-500" : "border-slate-700"}`}>
                 <View className="flex-row items-center gap-3">
-                  <View
-                    className="w-10 h-10 rounded-xl items-center justify-center"
-                    style={{ backgroundColor: score.color + "22" }}
-                  >
-                    <Ionicons name="school-outline" size={18} color={score.color} />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-white font-semibold">
-                      {score.subject}
-                    </Text>
-                    <Text className="text-slate-400 text-xs">{score.date}</Text>
-                  </View>
-                  <View className="items-end">
-                    <Text
-                      className="text-lg font-bold"
-                      style={{
-                        color:
-                          score.score >= 80
-                            ? "#10b981"
-                            : score.score >= 60
-                            ? "#f59e0b"
-                            : "#ef4444",
-                      }}
-                    >
-                      {score.score}%
-                    </Text>
-                  </View>
+                  <Ionicons name="school-outline" size={20} color="#6366f1" />
+                  <TextInput
+                    placeholder="Ex: Photosynthèse, Révolution française..."
+                    placeholderTextColor="#475569"
+                    value={topic}
+                    onChangeText={(t) => { setTopic(t); setError(""); }}
+                    className="flex-1 text-white text-sm"
+                  />
                 </View>
               </Card>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
+
+              {/* Erreur */}
+              {error !== "" && (
+                <View className="flex-row items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
+                  <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
+                  <Text className="text-red-400 text-xs flex-1">{err
