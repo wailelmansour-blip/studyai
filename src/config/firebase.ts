@@ -1,18 +1,28 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+// src/config/firebase.ts
+import { initializeApp, getApps } from "firebase/app";
+import { initializeAuth, getReactNativePersistence, getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCHTHN6P_drQxCehbhtVqmWrge9Ell76Cw",
+  apiKey: "AIzaSyCHTHN6P_drQxCehbhtVqmWrge9E1176Cw",
   authDomain: "studyai-82cd7.firebaseapp.com",
   projectId: "studyai-82cd7",
   storageBucket: "studyai-82cd7.firebasestorage.app",
   messagingSenderId: "369068414875",
   appId: "1:369068414875:web:151f86bc91d29383eaf33e",
-  measurementId: "G-G56B46YZF7"
+  measurementId: "G-G56B46YZF7",
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+const app = getApps().length === 0
+  ? initializeApp(firebaseConfig)
+  : getApps()[0];
+
+export const auth = getApps().length <= 1
+  ? initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    })
+  : getAuth(app);
+
 export const db = getFirestore(app);
 export default app;
