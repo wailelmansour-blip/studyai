@@ -1,4 +1,2 @@
 // src/lib/firebase.ts
-import app from "../config/firebase";
-export { auth, db } from "../config/firebase";
-export { app };
+export { auth, db, default } from "../services/firebase";
