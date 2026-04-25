@@ -8,8 +8,7 @@ import {
   onAuthStateChanged,
   User,
 } from "firebase/auth";
-//import { app } from "@/lib/firebase";
-import { app } from "../src/lib/firebase";
+import app from "../src/config/firebase";
 
 const auth = getAuth(app);
 

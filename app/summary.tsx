@@ -1,3 +1,2 @@
 // app/summary.tsx
-import SummaryScreen from "../src/screens/main/SummaryScreen";
-export default SummaryScreen;
+export { default } from "../src/screens/main/SummaryScreen";
