@@ -9,8 +9,9 @@ import {
   orderBy,
   Timestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { StudyPlan } from "@/types/plan";
+//import { db } from "@/lib/firebase";
+import { StudyPlan } from "../types/plan";
+import { db } from "../src/lib/firebase";
 
 interface PlanState {
   plans: StudyPlan[];

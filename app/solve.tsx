@@ -9,9 +9,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth } from "firebase/auth";
-import { app } from "@/lib/firebase";
+/*import { app } from "@/lib/firebase";
 import { useAiStore } from "@/store/aiStore";
 import { SolveResult } from "@/types/ai";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { getAuth } from "firebase/auth";*/
+import { app } from "../src/lib/firebase";
+import { useAiStore } from "../store/aiStore";
+import { SolveResult } from "../types/ai";
 
 const functions = getFunctions(app, "us-central1");
 

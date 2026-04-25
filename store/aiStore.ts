@@ -1,8 +1,9 @@
 // store/aiStore.ts
 import { create } from "zustand";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { ExplainResult, SolveResult, FlashcardsResult } from "@/types/ai";
+//import { db } from "@/lib/firebase";
+import { ExplainResult, SolveResult, FlashcardsResult } from "../types/ai";
+import { db } from "../src/lib/firebase";
 
 interface AiState {
   isLoading: boolean;

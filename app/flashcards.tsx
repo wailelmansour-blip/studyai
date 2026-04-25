@@ -7,11 +7,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { getFunctions, httpsCallable } from "firebase/functions";
+/*import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth } from "firebase/auth";
 import { app } from "@/lib/firebase";
 import { useAiStore } from "@/store/aiStore";
-import { FlashcardsResult, Flashcard } from "@/types/ai";
+import { FlashcardsResult, Flashcard } from "@/types/ai";*/
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { getAuth } from "firebase/auth";
+import { app } from "../src/lib/firebase";
+import { useAiStore } from "../store/aiStore";
+import { FlashcardsResult, Flashcard } from "../types/ai";
 
 const functions = getFunctions(app, "us-central1");
 

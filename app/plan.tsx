@@ -16,9 +16,14 @@ import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth } from "firebase/auth";
-import { app } from "@/lib/firebase";
+/*import { app } from "@/lib/firebase";
 import { usePlanStore } from "@/store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "@/types/plan";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { getAuth } from "firebase/auth";*/
+import { app } from "../src/lib/firebase";
+import { usePlanStore } from "../store/planStore";
+import { StudyPlan, StudySession, GeneratePlanInput } from "../types/plan";
 
 const functions = getFunctions(app, "us-central1");
 

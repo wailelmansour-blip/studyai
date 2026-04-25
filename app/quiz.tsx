@@ -1,2 +1,3 @@
-import QuizScreen from "../src/screens/main/QuizScreen";
+// app/quiz.tsx
+import { QuizScreen } from "../src/screens/main/QuizScreen";
 export default QuizScreen;
