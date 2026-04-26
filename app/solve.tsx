@@ -14,7 +14,7 @@ import { useAiStore } from "@/store/aiStore";
 import { SolveResult } from "@/types/ai";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth } from "firebase/auth";*/
-import { app } from "../src/lib/firebase";
+import app from "../src/services/firebase";
 import { useAiStore } from "../store/aiStore";
 import { SolveResult } from "../types/ai";
 

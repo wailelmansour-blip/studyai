@@ -21,7 +21,7 @@ import { usePlanStore } from "@/store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "@/types/plan";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAuth } from "firebase/auth";*/
-import { app } from "../src/lib/firebase";
+import app from "../src/services/firebase";
 import { usePlanStore } from "../store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "../types/plan";
 

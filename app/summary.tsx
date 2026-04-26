@@ -8,14 +8,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth } from "firebase/auth";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
-import app, { db } from "../src/services/firebase";
+import app, { auth, db } from "../src/services/firebase";
 
 const functions = getFunctions(app, "us-central1");
 
 export default function SummaryScreen() {
-  const auth = getAuth(app);
   const [inputText, setInputText] = useState("");
   const [summary, setSummary] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -45,6 +43,7 @@ export default function SummaryScreen() {
     if (!summary) return;
     try {
       const user = auth.currentUser;
+      // auth est maintenant importé directement depuis services/firebase
       await addDoc(collection(db, "summaries"), {
         userId: user?.uid || "anonymous",
         originalText: inputText,
