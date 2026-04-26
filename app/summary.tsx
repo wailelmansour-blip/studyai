@@ -25,24 +25,34 @@ export default function SummaryScreen() {
   const [isSaved, setIsSaved] = useState(false);
 
   const handleSummarize = async () => {
-    if (inputText.trim().length < 20) {
-      Alert.alert("Erreur", "Saisis au moins 20 caractères à résumer.");
+  if (inputText.trim().length < 20) {
+    Alert.alert("Erreur", "Saisis au moins 20 caractères à résumer.");
+    return;
+  }
+  setIsLoading(true);
+  setSummary("");
+  setIsSaved(false);
+  try {
+    // Force le refresh du token avant l'appel
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Erreur", "Tu dois être connecté.");
       return;
     }
-    setIsLoading(true);
-    setSummary("");
-    setIsSaved(false);
-    try {
-      const fn = httpsCallable(functions, "summarize");
-      const res = await fn({ text: inputText });
-      const data = res.data as any;
-      setSummary(data.summary || data.text || "");
-    } catch (e: any) {
-      Alert.alert("Erreur", e.message || "La génération a échoué.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const token = await user.getIdToken(true); // true = force refresh
+    console.log("Token refreshed:", token.substring(0, 20));
+
+    const fn = httpsCallable(functions, "summarize");
+    const res = await fn({ text: inputText });
+    const data = res.data as any;
+    setSummary(data.summary || data.text || "");
+  } catch (e: any) {
+    console.log("Erreur complète:", JSON.stringify(e));
+    Alert.alert("Erreur", e.message || "La génération a échoué.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleSave = async () => {
     if (!summary) return;
