@@ -1,3 +1,4 @@
+// app/solve.tsx
 import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -11,24 +12,34 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { SolveResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
+import { useTranslation } from "react-i18next";
+import { useLanguageStore } from "../store/languageStore";
 
 export default function SolveScreen() {
   const app = getApp();
   const auth = getAuth(app);
   const functions = getFunctions(app, "us-central1");
   const { saveSolution, isLoading } = useAiStore();
-  // ... reste du code identique
+  const { t } = useTranslation();
+  const { currentLanguage } = useLanguageStore();
+  const isRTL = currentLanguage === "ar";
+
   const [exercise, setExercise] = useState("");
   const [subject, setSubject] = useState("");
   const [result, setResult] = useState<SolveResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const SUBJECTS = ["Maths", "Physique", "Chimie", "Info", "Autre"];
+  const SUBJECTS =
+    currentLanguage === "ar"
+      ? ["رياضيات", "فيزياء", "كيمياء", "معلوماتية", "أخرى"]
+      : currentLanguage === "en"
+      ? ["Maths", "Physics", "Chemistry", "CS", "Other"]
+      : ["Maths", "Physique", "Chimie", "Info", "Autre"];
 
   const handleSolve = async () => {
     if (exercise.trim().length < 5) {
-      Alert.alert("Erreur", "Saisis l'exercice à résoudre.");
+      Alert.alert(t("error"), "Saisis l'exercice à résoudre.");
       return;
     }
     setGenerating(true);
@@ -36,7 +47,7 @@ export default function SolveScreen() {
     setSaved(false);
     try {
       const fn = httpsCallable(functions, "solveExercise");
-      const res = await fn({ exercise, subject });
+      const res = await fn({ exercise, subject, language: currentLanguage });
       const data = res.data as any;
       setResult({
         userId: auth.currentUser?.uid || "anonymous",
@@ -47,7 +58,7 @@ export default function SolveScreen() {
         createdAt: new Date().toISOString(),
       });
     } catch (e: any) {
-      Alert.alert("Erreur", e.message || "La résolution a échoué.");
+      Alert.alert(t("error"), e.message || "La résolution a échoué.");
     } finally {
       setGenerating(false);
     }
@@ -58,39 +69,58 @@ export default function SolveScreen() {
     try {
       await saveSolution(result);
       setSaved(true);
-      Alert.alert("✅ Sauvegardé", "La solution a été enregistrée.");
+      Alert.alert("✅", t("saved"));
     } catch {
-      Alert.alert("Erreur", "La sauvegarde a échoué.");
+      Alert.alert(t("error"), "La sauvegarde a échoué.");
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
-        keyboardShouldPersistTaps="handled">
-
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header */}
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-            <Ionicons name="arrow-back" size={24} color="#374151" />
+        <View style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          alignItems: "center", marginBottom: 24,
+        }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+          >
+            <Ionicons
+              name={isRTL ? "arrow-forward" : "arrow-back"}
+              size={24} color="#374151"
+            />
           </TouchableOpacity>
           <View>
-            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
-              Résoudre un exercice
+            <Text style={{
+              fontSize: 22, fontWeight: "700", color: "#111827",
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              {t("solve_title_screen")}
             </Text>
             <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-              Solution IA · GPT-4o-mini
+              {t("generated_by")}
             </Text>
           </View>
         </View>
 
         {/* Matière */}
-        <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10 }}>
-          📚 Matière
+        <Text style={{
+          fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10,
+          textAlign: isRTL ? "right" : "left",
+        }}>
+          📚 {t("solve_title_screen").includes("Solve") ? "Subject" : currentLanguage === "ar" ? "المادة" : "Matière"}
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 20 }}>
-          <View style={{ flexDirection: "row", gap: 8 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: 20 }}
+        >
+          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
             {SUBJECTS.map((s) => (
               <TouchableOpacity
                 key={s}
@@ -113,20 +143,25 @@ export default function SolveScreen() {
         </ScrollView>
 
         {/* Exercice */}
-        <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
-          ✏️ Exercice à résoudre
+        <Text style={{
+          fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 8,
+          textAlign: isRTL ? "right" : "left",
+        }}>
+          ✏️ {t("exercise_input")}
         </Text>
         <TextInput
           value={exercise}
           onChangeText={setExercise}
-          placeholder="Colle ou tape l'exercice ici..."
+          placeholder={t("exercise_input") + "..."}
           placeholderTextColor="#9CA3AF"
           multiline
           numberOfLines={6}
+          textAlign={isRTL ? "right" : "left"}
           style={{
             backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
             borderRadius: 12, padding: 14, fontSize: 14, color: "#111827",
             minHeight: 140, textAlignVertical: "top", marginBottom: 24,
+            writingDirection: isRTL ? "rtl" : "ltr",
           }}
         />
 
@@ -144,14 +179,14 @@ export default function SolveScreen() {
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <ActivityIndicator color="#FFF" size="small" />
               <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 10 }}>
-                Résolution en cours...
+                {t("solving")}
               </Text>
             </View>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="calculator-outline" size={20} color="#FFF" />
               <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 8 }}>
-                Résoudre avec l'IA
+                {t("solve_btn")}
               </Text>
             </View>
           )}
@@ -162,7 +197,8 @@ export default function SolveScreen() {
           <View>
             {/* Matière détectée */}
             <View style={{
-              flexDirection: "row", alignItems: "center", marginBottom: 14,
+              flexDirection: isRTL ? "row-reverse" : "row",
+              alignItems: "center", marginBottom: 14,
             }}>
               <View style={{
                 backgroundColor: "#EEF2FF", borderRadius: 8,
@@ -180,26 +216,35 @@ export default function SolveScreen() {
                 backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
                 marginBottom: 14, borderWidth: 1, borderColor: "#E5E7EB",
               }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 12 }}>
-                  🪜 Étapes de résolution
+                <Text style={{
+                  fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 12,
+                  textAlign: isRTL ? "right" : "left",
+                }}>
+                  🪜 {t("steps")}
                 </Text>
                 {result.steps.map((step, i) => (
                   <View key={i} style={{
-                    flexDirection: "row", alignItems: "flex-start",
-                    marginBottom: 10, paddingBottom: 10,
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    alignItems: "flex-start", marginBottom: 10, paddingBottom: 10,
                     borderBottomWidth: i < result.steps.length - 1 ? 1 : 0,
                     borderBottomColor: "#F3F4F6",
                   }}>
                     <View style={{
                       width: 24, height: 24, borderRadius: 12, backgroundColor: "#6366F1",
                       alignItems: "center", justifyContent: "center",
-                      marginRight: 10, marginTop: 1, flexShrink: 0,
+                      marginRight: isRTL ? 0 : 10,
+                      marginLeft: isRTL ? 10 : 0,
+                      flexShrink: 0,
                     }}>
                       <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFF" }}>
                         {i + 1}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 13, color: "#374151", flex: 1, lineHeight: 20 }}>
+                    <Text style={{
+                      fontSize: 13, color: "#374151", flex: 1, lineHeight: 20,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}>
                       {step}
                     </Text>
                   </View>
@@ -210,18 +255,29 @@ export default function SolveScreen() {
             {/* Solution finale */}
             <View style={{
               backgroundColor: "#F0FDF4", borderRadius: 14, padding: 16,
-              marginBottom: 16, borderLeftWidth: 4, borderLeftColor: "#10B981",
+              marginBottom: 16,
+              borderLeftWidth: isRTL ? 0 : 4,
+              borderRightWidth: isRTL ? 4 : 0,
+              borderLeftColor: "#10B981",
+              borderRightColor: "#10B981",
             }}>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: "#065F46", marginBottom: 8 }}>
-                ✅ Solution finale
+              <Text style={{
+                fontSize: 14, fontWeight: "700", color: "#065F46", marginBottom: 8,
+                textAlign: isRTL ? "right" : "left",
+              }}>
+                ✅ {t("final_solution")}
               </Text>
-              <Text style={{ fontSize: 14, color: "#065F46", lineHeight: 22 }}>
+              <Text style={{
+                fontSize: 14, color: "#065F46", lineHeight: 22,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}>
                 {result.solution}
               </Text>
             </View>
 
             {/* Actions */}
-            <View style={{ flexDirection: "row", gap: 12 }}>
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
               <TouchableOpacity
                 onPress={() => { setResult(null); setSaved(false); setExercise(""); }}
                 style={{
@@ -230,7 +286,7 @@ export default function SolveScreen() {
                 }}
               >
                 <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
-                  🔄 Nouveau
+                  🔄 {t("new")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -245,7 +301,7 @@ export default function SolveScreen() {
                   <ActivityIndicator color="#FFF" size="small" />
                 ) : (
                   <Text style={{ fontWeight: "600", color: "#FFF", fontSize: 15 }}>
-                    {saved ? "✅ Sauvegardé" : "💾 Sauvegarder"}
+                    {saved ? `✅ ${t("saved")}` : `💾 ${t("save")}`}
                   </Text>
                 )}
               </TouchableOpacity>

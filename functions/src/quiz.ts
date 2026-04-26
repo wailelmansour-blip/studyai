@@ -1,3 +1,4 @@
+// functions/src/quiz.ts
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import OpenAI from "openai";
@@ -5,16 +6,14 @@ import OpenAI from "openai";
 const openaiKey = defineSecret("OPENAI_API_KEY");
 
 export const generateQuiz = onCall(
-  { secrets: [openaiKey], region: "us-central1" },
+  { secrets: [openaiKey], region: "us-central1", invoker: "public" },
   async (request) => {
 
-    // 1. Authentification
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
     }
 
-    // 2. Validation
-    const { topic, count = 5 } = request.data ?? {};
+    const { topic, count = 5, language = "fr" } = request.data ?? {};
 
     if (!topic || typeof topic !== "string") {
       throw new HttpsError("invalid-argument", "Champ 'topic' requis.");
@@ -26,7 +25,13 @@ export const generateQuiz = onCall(
       throw new HttpsError("invalid-argument", "count doit être entre 1 et 20.");
     }
 
-    // 3. Appel OpenAI
+    const langInstruction =
+      language === "ar"
+        ? "أنشئ الأسئلة والخيارات والشرح باللغة العربية حصراً."
+        : language === "en"
+        ? "Generate all questions, options and explanations exclusively in English."
+        : "Génère toutes les questions, options et explications exclusivement en français.";
+
     const openai = new OpenAI({ apiKey: openaiKey.value() });
 
     const completion = await openai.chat.completions.create({
@@ -34,7 +39,7 @@ export const generateQuiz = onCall(
       messages: [
         {
           role: "system",
-          content: `Tu es un créateur de quiz pédagogique. 
+          content: `Tu es un créateur de quiz pédagogique. ${langInstruction}
 Génère exactement ${count} questions QCM sur le sujet demandé.
 Réponds UNIQUEMENT avec un JSON valide, sans texte avant ou après, avec ce format :
 {
@@ -42,7 +47,8 @@ Réponds UNIQUEMENT avec un JSON valide, sans texte avant ou après, avec ce for
     {
       "question": "...",
       "options": ["A", "B", "C", "D"],
-      "correct": 0
+      "correct": 0,
+      "explanation": "..."
     }
   ]
 }

@@ -1,3 +1,4 @@
+// app/plan.tsx
 import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -12,28 +13,28 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { usePlanStore } from "../store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "../types/plan";
+import { useTranslation } from "react-i18next";
+import { useLanguageStore } from "../store/languageStore";
 
 export default function PlanScreen() {
   const app = getApp();
   const auth = getAuth(app);
   const functions = getFunctions(app, "us-central1");
   const { savePlan, isLoading } = usePlanStore();
-  // ... reste du code identique
+  const { t } = useTranslation();
+  const { currentLanguage } = useLanguageStore();
+  const isRTL = currentLanguage === "ar";
 
-  // --- Form state ---
   const [subjects, setSubjects] = useState<string[]>([""]);
   const [examDate, setExamDate] = useState<Date>(
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [hoursPerDay, setHoursPerDay] = useState("2");
-
-  // --- Result state ---
   const [generatedPlan, setGeneratedPlan] = useState<StudyPlan | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // --- Subjects helpers ---
   const addSubject = () => {
     if (subjects.length < 8) setSubjects([...subjects, ""]);
   };
@@ -49,34 +50,31 @@ export default function PlanScreen() {
     setSubjects(updated);
   };
 
-  // --- Date helpers ---
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString("fr-FR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
+  const formatDate = (date: Date) => {
+    const locale =
+      currentLanguage === "ar" ? "ar-SA"
+      : currentLanguage === "en" ? "en-GB"
+      : "fr-FR";
+    return date.toLocaleDateString(locale, {
+      weekday: "long", day: "numeric",
+      month: "long", year: "numeric",
     });
+  };
 
   const daysUntilExam = () => {
     const diff = examDate.getTime() - Date.now();
     return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   };
 
-  // --- Generate plan ---
   const handleGenerate = async () => {
     const validSubjects = subjects.filter((s) => s.trim().length > 0);
     if (validSubjects.length === 0) {
-      Alert.alert("Erreur", "Ajoute au moins une matière.");
+      Alert.alert(t("error"), "Ajoute au moins une matière.");
       return;
     }
     const hours = parseFloat(hoursPerDay);
     if (isNaN(hours) || hours < 0.5 || hours > 12) {
-      Alert.alert("Erreur", "Heures par jour : entre 0.5 et 12.");
-      return;
-    }
-    if (daysUntilExam() < 1) {
-      Alert.alert("Erreur", "La date d'examen doit être dans le futur.");
+      Alert.alert(t("error"), "Heures par jour : entre 0.5 et 12.");
       return;
     }
 
@@ -91,13 +89,11 @@ export default function PlanScreen() {
         examDate: examDate.toISOString(),
         hoursPerDay: hours,
       };
-      const result = await generatePlanFn(input);
+      const result = await generatePlanFn({ ...input, language: currentLanguage });
       const data = result.data as any;
 
-      // Convertir schedule { Lundi: [...] } → sessions [ { day, subject, ... } ]
       const sessions: StudySession[] = [];
       const schedule = data.schedule || {};
-
       Object.entries(schedule).forEach(([day, items]: [string, any]) => {
         if (!items || items.length === 0) return;
         items.forEach((item: any) => {
@@ -123,30 +119,23 @@ export default function PlanScreen() {
       };
       setGeneratedPlan(plan);
     } catch (error: any) {
-      Alert.alert(
-        "Erreur de génération",
-        error.message || "La génération a échoué. Réessaie."
-      );
+      Alert.alert(t("error"), error.message || "La génération a échoué.");
     } finally {
       setGenerating(false);
     }
   };
 
-  // --- Save plan ---
   const handleSave = async () => {
     if (!generatedPlan) return;
     try {
       await savePlan(generatedPlan);
       setSaved(true);
-      Alert.alert("✅ Sauvegardé", "Ton plan d'étude a été enregistré.", [
-        { text: "OK" },
-      ]);
+      Alert.alert("✅", t("saved"));
     } catch {
-      Alert.alert("Erreur", "La sauvegarde a échoué.");
+      Alert.alert(t("error"), "La sauvegarde a échoué.");
     }
   };
 
-  // --- Reset ---
   const handleReset = () => {
     setGeneratedPlan(null);
     setSaved(false);
@@ -161,76 +150,66 @@ export default function PlanScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Header ── */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 24,
-          }}
-        >
+        {/* Header */}
+        <View style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          alignItems: "center", marginBottom: 24,
+        }}>
           <TouchableOpacity
             onPress={() => router.back()}
-            style={{ marginRight: 12 }}
+            style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
           >
-            <Ionicons name="arrow-back" size={24} color="#374151" />
+            <Ionicons
+              name={isRTL ? "arrow-forward" : "arrow-back"}
+              size={24} color="#374151"
+            />
           </TouchableOpacity>
           <View>
-            <Text
-              style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}
-            >
-              Plan d'étude
+            <Text style={{
+              fontSize: 22, fontWeight: "700", color: "#111827",
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              {t("plan_screen_title")}
             </Text>
             <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-              Généré par IA · GPT-4o-mini
+              {t("generated_by")}
             </Text>
           </View>
         </View>
 
-        {/* ── Form ── */}
+        {/* Form */}
         {!generatedPlan && (
           <View>
             {/* Matières */}
             <View style={{ marginBottom: 20 }}>
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: "600",
-                  color: "#374151",
-                  marginBottom: 10,
-                }}
-              >
-                📚 Matières à réviser
+              <Text style={{
+                fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10,
+                textAlign: isRTL ? "right" : "left",
+              }}>
+                📚 {t("subjects")}
               </Text>
               {subjects.map((subject, index) => (
-                <View
-                  key={index}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginBottom: 8,
-                  }}
-                >
+                <View key={index} style={{
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center", marginBottom: 8,
+                }}>
                   <TextInput
                     value={subject}
                     onChangeText={(v) => updateSubject(index, v)}
-                    placeholder={`Matière ${index + 1} (ex: Mathématiques)`}
+                    placeholder={`${currentLanguage === "ar" ? "مادة" : currentLanguage === "en" ? "Subject" : "Matière"} ${index + 1}`}
                     placeholderTextColor="#9CA3AF"
+                    textAlign={isRTL ? "right" : "left"}
                     style={{
-                      flex: 1,
-                      backgroundColor: "#FFFFFF",
-                      borderWidth: 1,
-                      borderColor: "#E5E7EB",
-                      borderRadius: 10,
-                      padding: 12,
-                      fontSize: 15,
-                      color: "#111827",
+                      flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1,
+                      borderColor: "#E5E7EB", borderRadius: 10, padding: 12,
+                      fontSize: 15, color: "#111827",
+                      writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   />
                   {subjects.length > 1 && (
                     <TouchableOpacity
                       onPress={() => removeSubject(index)}
-                      style={{ marginLeft: 8, padding: 8 }}
+                      style={{ marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0, padding: 8 }}
                     >
                       <Ionicons name="close-circle" size={22} color="#EF4444" />
                     </TouchableOpacity>
@@ -241,22 +220,17 @@ export default function PlanScreen() {
                 <TouchableOpacity
                   onPress={addSubject}
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginTop: 4,
-                    alignSelf: "flex-start",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    alignItems: "center", marginTop: 4,
+                    alignSelf: isRTL ? "flex-end" : "flex-start",
                   }}
                 >
                   <Ionicons name="add-circle-outline" size={20} color="#6366F1" />
-                  <Text
-                    style={{
-                      color: "#6366F1",
-                      marginLeft: 6,
-                      fontSize: 14,
-                      fontWeight: "500",
-                    }}
-                  >
-                    Ajouter une matière
+                  <Text style={{
+                    color: "#6366F1", marginLeft: isRTL ? 0 : 6,
+                    marginRight: isRTL ? 6 : 0, fontSize: 14, fontWeight: "500",
+                  }}>
+                    {t("add_subject")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -264,48 +238,30 @@ export default function PlanScreen() {
 
             {/* Date d'examen */}
             <View style={{ marginBottom: 20 }}>
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: "600",
-                  color: "#374151",
-                  marginBottom: 10,
-                }}
-              >
-                📅 Date d'examen
+              <Text style={{
+                fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10,
+                textAlign: isRTL ? "right" : "left",
+              }}>
+                📅 {t("exam_date")}
               </Text>
               <TouchableOpacity
                 onPress={() => setShowDatePicker(true)}
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  borderRadius: 10,
-                  padding: 14,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+                  backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
+                  borderRadius: 10, padding: 14,
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center", justifyContent: "space-between",
                 }}
               >
                 <Text style={{ fontSize: 15, color: "#111827" }}>
                   {formatDate(examDate)}
                 </Text>
-                <View
-                  style={{
-                    backgroundColor: "#EEF2FF",
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#6366F1",
-                      fontSize: 13,
-                      fontWeight: "600",
-                    }}
-                  >
-                    J-{daysUntilExam()}
+                <View style={{
+                  backgroundColor: "#EEF2FF", borderRadius: 8,
+                  paddingHorizontal: 10, paddingVertical: 4,
+                }}>
+                  <Text style={{ color: "#6366F1", fontSize: 13, fontWeight: "600" }}>
+                    {isRTL ? `${daysUntilExam()}-ي` : `J-${daysUntilExam()}`}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -325,40 +281,27 @@ export default function PlanScreen() {
 
             {/* Heures par jour */}
             <View style={{ marginBottom: 28 }}>
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: "600",
-                  color: "#374151",
-                  marginBottom: 10,
-                }}
-              >
-                ⏱ Heures de travail par jour
+              <Text style={{
+                fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10,
+                textAlign: isRTL ? "right" : "left",
+              }}>
+                ⏱ {t("hours_per_day")}
               </Text>
-              <View style={{ flexDirection: "row", gap: 10 }}>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
                 {["1", "2", "3", "4", "6"].map((h) => (
                   <TouchableOpacity
                     key={h}
                     onPress={() => setHoursPerDay(h)}
                     style={{
-                      flex: 1,
-                      paddingVertical: 12,
-                      borderRadius: 10,
-                      alignItems: "center",
-                      backgroundColor:
-                        hoursPerDay === h ? "#6366F1" : "#FFFFFF",
-                      borderWidth: 1,
-                      borderColor:
-                        hoursPerDay === h ? "#6366F1" : "#E5E7EB",
+                      flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center",
+                      backgroundColor: hoursPerDay === h ? "#6366F1" : "#FFFFFF",
+                      borderWidth: 1, borderColor: hoursPerDay === h ? "#6366F1" : "#E5E7EB",
                     }}
                   >
-                    <Text
-                      style={{
-                        fontWeight: "600",
-                        fontSize: 15,
-                        color: hoursPerDay === h ? "#FFFFFF" : "#374151",
-                      }}
-                    >
+                    <Text style={{
+                      fontWeight: "600", fontSize: 15,
+                      color: hoursPerDay === h ? "#FFFFFF" : "#374151",
+                    }}>
                       {h}h
                     </Text>
                   </TouchableOpacity>
@@ -372,42 +315,22 @@ export default function PlanScreen() {
               disabled={generating}
               style={{
                 backgroundColor: generating ? "#A5B4FC" : "#6366F1",
-                borderRadius: 14,
-                padding: 16,
-                alignItems: "center",
-                shadowColor: "#6366F1",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
+                borderRadius: 14, padding: 16, alignItems: "center",
                 elevation: 4,
               }}
             >
               {generating ? (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <ActivityIndicator color="#FFFFFF" size="small" />
-                  <Text
-                    style={{
-                      color: "#FFFFFF",
-                      fontWeight: "700",
-                      fontSize: 16,
-                      marginLeft: 10,
-                    }}
-                  >
-                    Génération en cours...
+                  <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 16, marginLeft: 10 }}>
+                    {t("generating_plan")}
                   </Text>
                 </View>
               ) : (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons name="sparkles" size={20} color="#FFFFFF" />
-                  <Text
-                    style={{
-                      color: "#FFFFFF",
-                      fontWeight: "700",
-                      fontSize: 16,
-                      marginLeft: 8,
-                    }}
-                  >
-                    Générer mon plan IA
+                  <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 16, marginLeft: 8 }}>
+                    {t("generate_plan")}
                   </Text>
                 </View>
               )}
@@ -415,113 +338,80 @@ export default function PlanScreen() {
           </View>
         )}
 
-        {/* ── Résultat ── */}
+        {/* Résultat */}
         {generatedPlan && (
           <View>
             {/* Résumé */}
-            <View
-              style={{
-                backgroundColor: "#EEF2FF",
-                borderRadius: 14,
-                padding: 16,
-                marginBottom: 20,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 17,
-                  fontWeight: "700",
-                  color: "#3730A3",
-                  marginBottom: 6,
-                }}
-              >
+            <View style={{
+              backgroundColor: "#EEF2FF", borderRadius: 14, padding: 16, marginBottom: 20,
+            }}>
+              <Text style={{
+                fontSize: 17, fontWeight: "700", color: "#3730A3", marginBottom: 6,
+                textAlign: isRTL ? "right" : "left",
+              }}>
                 🎯 {generatedPlan.title}
               </Text>
-              <Text style={{ fontSize: 13, color: "#4338CA" }}>
-                {generatedPlan.totalDays} jours · {generatedPlan.subjects.length} matière
-                {generatedPlan.subjects.length > 1 ? "s" : ""} · jusqu'au{" "}
+              <Text style={{
+                fontSize: 13, color: "#4338CA",
+                textAlign: isRTL ? "right" : "left",
+              }}>
+                {generatedPlan.totalDays} {currentLanguage === "ar" ? "يوم" : currentLanguage === "en" ? "days" : "jours"} ·{" "}
+                {generatedPlan.subjects.length} {currentLanguage === "ar" ? "مادة" : currentLanguage === "en" ? "subjects" : "matières"} ·{" "}
                 {formatDate(examDate)}
               </Text>
             </View>
 
             {/* Sessions */}
             {generatedPlan.sessions.map((session: StudySession, index: number) => (
-              <View
-                key={index}
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 12,
-                  borderLeftWidth: 4,
-                  borderLeftColor: "#6366F1",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.06,
-                  shadowRadius: 4,
-                  elevation: 2,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: "700",
-                      color: "#111827",
-                      flex: 1,
-                    }}
-                  >
+              <View key={index} style={{
+                backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
+                marginBottom: 12,
+                borderLeftWidth: isRTL ? 0 : 4,
+                borderRightWidth: isRTL ? 4 : 0,
+                borderLeftColor: "#6366F1",
+                borderRightColor: "#6366F1",
+                elevation: 2,
+              }}>
+                <View style={{
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  justifyContent: "space-between", alignItems: "center", marginBottom: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 14, fontWeight: "700", color: "#111827", flex: 1,
+                    textAlign: isRTL ? "right" : "left",
+                  }}>
                     {session.day}
                   </Text>
-                  <View
-                    style={{
-                      backgroundColor: "#EEF2FF",
-                      borderRadius: 8,
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        color: "#6366F1",
-                        fontWeight: "600",
-                      }}
-                    >
+                  <View style={{
+                    backgroundColor: "#EEF2FF", borderRadius: 8,
+                    paddingHorizontal: 8, paddingVertical: 3,
+                  }}>
+                    <Text style={{ fontSize: 12, color: "#6366F1", fontWeight: "600" }}>
                       {session.duration} min
                     </Text>
                   </View>
                 </View>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: "#6366F1",
-                    fontWeight: "600",
-                    marginBottom: 6,
-                  }}
-                >
+                <Text style={{
+                  fontSize: 13, color: "#6366F1", fontWeight: "600", marginBottom: 6,
+                  textAlign: isRTL ? "right" : "left",
+                }}>
                   📖 {session.subject}
                 </Text>
                 {session.tasks?.map((task: string, ti: number) => (
-                  <View
-                    key={ti}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "flex-start",
-                      marginTop: 4,
-                    }}
-                  >
-                    <Text style={{ color: "#9CA3AF", marginRight: 6, marginTop: 1 }}>
-                      •
-                    </Text>
-                    <Text style={{ fontSize: 13, color: "#374151", flex: 1 }}>
+                  <View key={ti} style={{
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    alignItems: "flex-start", marginTop: 4,
+                  }}>
+                    <Text style={{
+                      color: "#9CA3AF",
+                      marginRight: isRTL ? 0 : 6,
+                      marginLeft: isRTL ? 6 : 0,
+                      marginTop: 1,
+                    }}>•</Text>
+                    <Text style={{
+                      fontSize: 13, color: "#374151", flex: 1,
+                      textAlign: isRTL ? "right" : "left",
+                    }}>
                       {task}
                     </Text>
                   </View>
@@ -531,39 +421,35 @@ export default function PlanScreen() {
 
             {/* Tips IA */}
             {generatedPlan.tips && generatedPlan.tips.length > 0 && (
-              <View
-                style={{
-                  backgroundColor: "#F0FDF4",
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 12,
-                  borderLeftWidth: 4,
-                  borderLeftColor: "#10B981",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: "700",
-                    color: "#065F46",
-                    marginBottom: 8,
-                  }}
-                >
-                  💡 Conseils IA
+              <View style={{
+                backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14,
+                marginBottom: 12,
+                borderLeftWidth: isRTL ? 0 : 4,
+                borderRightWidth: isRTL ? 4 : 0,
+                borderLeftColor: "#10B981",
+                borderRightColor: "#10B981",
+              }}>
+                <Text style={{
+                  fontSize: 14, fontWeight: "700", color: "#065F46", marginBottom: 8,
+                  textAlign: isRTL ? "right" : "left",
+                }}>
+                  💡 {t("ai_tips")}
                 </Text>
                 {generatedPlan.tips.map((tip: string, i: number) => (
-                  <View
-                    key={i}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "flex-start",
-                      marginTop: i > 0 ? 6 : 0,
-                    }}
-                  >
-                    <Text style={{ color: "#10B981", marginRight: 6, marginTop: 1 }}>
-                      •
-                    </Text>
-                    <Text style={{ fontSize: 13, color: "#065F46", flex: 1 }}>
+                  <View key={i} style={{
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    alignItems: "flex-start", marginTop: i > 0 ? 6 : 0,
+                  }}>
+                    <Text style={{
+                      color: "#10B981",
+                      marginRight: isRTL ? 0 : 6,
+                      marginLeft: isRTL ? 6 : 0,
+                      marginTop: 1,
+                    }}>•</Text>
+                    <Text style={{
+                      fontSize: 13, color: "#065F46", flex: 1,
+                      textAlign: isRTL ? "right" : "left",
+                    }}>
                       {tip}
                     </Text>
                   </View>
@@ -572,32 +458,26 @@ export default function PlanScreen() {
             )}
 
             {/* Actions */}
-            <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              gap: 12, marginTop: 8,
+            }}>
               <TouchableOpacity
                 onPress={handleReset}
                 style={{
-                  flex: 1,
-                  borderRadius: 12,
-                  padding: 14,
-                  alignItems: "center",
-                  backgroundColor: "#F3F4F6",
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
+                  flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+                  backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
                 }}
               >
                 <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
-                  🔄 Nouveau plan
+                  🔄 {t("new_plan")}
                 </Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 onPress={handleSave}
                 disabled={saved || isLoading}
                 style={{
-                  flex: 1,
-                  borderRadius: 12,
-                  padding: 14,
-                  alignItems: "center",
+                  flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
                   backgroundColor: saved ? "#10B981" : "#6366F1",
                 }}
               >
@@ -605,7 +485,7 @@ export default function PlanScreen() {
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
                   <Text style={{ fontWeight: "600", color: "#FFFFFF", fontSize: 15 }}>
-                    {saved ? "✅ Sauvegardé" : "💾 Sauvegarder"}
+                    {saved ? `✅ ${t("saved")}` : `💾 ${t("save")}`}
                   </Text>
                 )}
               </TouchableOpacity>

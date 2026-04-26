@@ -1,3 +1,4 @@
+// functions/src/plan.ts
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import OpenAI from "openai";
@@ -5,16 +6,14 @@ import OpenAI from "openai";
 const openaiKey = defineSecret("OPENAI_API_KEY");
 
 export const generatePlan = onCall(
-  { secrets: [openaiKey], region: "us-central1" },
+  { secrets: [openaiKey], region: "us-central1", invoker: "public" },
   async (request) => {
 
-    // 1. Authentification
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
     }
 
-    // 2. Validation
-    const { subjects, daysPerWeek = 5, hoursPerDay = 2 } = request.data ?? {};
+    const { subjects, daysPerWeek = 5, hoursPerDay = 2, language = "fr" } = request.data ?? {};
 
     if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
       throw new HttpsError("invalid-argument", "Champ 'subjects' requis (tableau non vide).");
@@ -29,7 +28,13 @@ export const generatePlan = onCall(
       throw new HttpsError("invalid-argument", "hoursPerDay doit être entre 1 et 12.");
     }
 
-    // 3. Appel OpenAI
+    const langInstruction =
+      language === "ar"
+        ? "أنشئ الخطة والجدول والنصائح باللغة العربية حصراً. استخدم أسماء الأيام بالعربية: الاثنين، الثلاثاء، الأربعاء، الخميس، الجمعة، السبت، الأحد."
+        : language === "en"
+        ? "Generate the plan, schedule and tips exclusively in English. Use English day names: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday."
+        : "Génère le plan, le planning et les conseils exclusivement en français. Utilise les noms de jours en français: Lundi, Mardi, Mercredi, Jeudi, Vendredi, Samedi, Dimanche.";
+
     const openai = new OpenAI({ apiKey: openaiKey.value() });
 
     const subjectsList = subjects
@@ -41,7 +46,7 @@ export const generatePlan = onCall(
       messages: [
         {
           role: "system",
-          content: `Tu es un coach pédagogique expert. 
+          content: `Tu es un coach pédagogique expert. ${langInstruction}
 Crée un planning d'étude hebdomadaire structuré et motivant.
 Réponds UNIQUEMENT avec un JSON valide avec ce format :
 {

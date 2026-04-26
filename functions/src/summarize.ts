@@ -13,6 +13,8 @@ export const summarize = onCall(
   },
   async (request) => {
     const text = request.data?.text;
+    const language = request.data?.language || "fr";
+
     if (!text || typeof text !== "string") {
       throw new HttpsError("invalid-argument", "Champ 'text' requis.");
     }
@@ -23,13 +25,20 @@ export const summarize = onCall(
       throw new HttpsError("invalid-argument", "Texte trop long (max 50 000 caractères).");
     }
 
+    const langInstruction =
+      language === "ar"
+        ? "أجب باللغة العربية حصراً."
+        : language === "en"
+        ? "Answer exclusively in English."
+        : "Réponds exclusivement en français.";
+
     const openai = new OpenAI({ apiKey: openaiKey.value() });
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: "Tu es un assistant pédagogique. Résume le texte fourni de manière claire et concise en bullet points. Réponds dans la même langue que le texte.",
+          content: `Tu es un assistant pédagogique. Résume le texte fourni de manière claire et concise en bullet points. ${langInstruction}`,
         },
         {
           role: "user",

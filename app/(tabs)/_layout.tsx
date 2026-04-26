@@ -1,8 +1,11 @@
 // app/(tabs)/_layout.tsx
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 
 export default function TabsLayout() {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       screenOptions={{
@@ -26,7 +29,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: "Accueil",
+          title: t("home"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
           ),
@@ -35,7 +38,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="study"
         options={{
-          title: "Étudier",
+          title: t("study"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons name={focused ? "book" : "book-outline"} size={24} color={color} />
           ),
@@ -44,7 +47,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="quiz"
         options={{
-          title: "Quiz",
+          title: t("quiz"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons name={focused ? "help-circle" : "help-circle-outline"} size={24} color={color} />
           ),
@@ -53,7 +56,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="planning"
         options={{
-          title: "Planning",
+          title: t("planning"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} />
           ),
@@ -62,7 +65,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Chat IA",
+          title: t("chat"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={24} color={color} />
           ),
@@ -71,7 +74,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profil",
+          title: t("profile"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
           ),

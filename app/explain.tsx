@@ -1,3 +1,4 @@
+// app/explain.tsx
 import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -7,18 +8,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { getFirestore, collection, addDoc, Timestamp } from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { ExplainResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
+import { useTranslation } from "react-i18next";
+import { useLanguageStore } from "../store/languageStore";
 
 export default function ExplainScreen() {
   const app = getApp();
   const auth = getAuth(app);
   const functions = getFunctions(app, "us-central1");
   const { saveExplanation, isLoading } = useAiStore();
-  // ... reste du code identique
+  const { t } = useTranslation();
+  const { currentLanguage } = useLanguageStore();
+  const isRTL = currentLanguage === "ar";
 
   const [text, setText] = useState("");
   const [difficulty, setDifficulty] = useState<"facile" | "moyen" | "difficile">("moyen");
@@ -26,9 +30,21 @@ export default function ExplainScreen() {
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const difficultyColors: Record<string, string> = {
+    facile: "#10B981",
+    moyen: "#F59E0B",
+    difficile: "#EF4444",
+  };
+
+  const difficultyLabels = {
+    facile: currentLanguage === "ar" ? "سهل" : currentLanguage === "en" ? "Easy" : "Facile",
+    moyen: currentLanguage === "ar" ? "متوسط" : currentLanguage === "en" ? "Medium" : "Moyen",
+    difficile: currentLanguage === "ar" ? "صعب" : currentLanguage === "en" ? "Hard" : "Difficile",
+  };
+
   const handleExplain = async () => {
     if (text.trim().length < 10) {
-      Alert.alert("Erreur", "Saisis au moins 10 caractères.");
+      Alert.alert(t("error"), "Saisis au moins 10 caractères.");
       return;
     }
     setGenerating(true);
@@ -36,7 +52,7 @@ export default function ExplainScreen() {
     setSaved(false);
     try {
       const fn = httpsCallable(functions, "explainText");
-      const res = await fn({ text, difficulty });
+      const res = await fn({ text, difficulty, language: currentLanguage });
       const data = res.data as any;
       setResult({
         userId: auth.currentUser?.uid || "anonymous",
@@ -47,7 +63,7 @@ export default function ExplainScreen() {
         createdAt: new Date().toISOString(),
       });
     } catch (e: any) {
-      Alert.alert("Erreur", e.message || "La génération a échoué.");
+      Alert.alert(t("error"), e.message || "La génération a échoué.");
     } finally {
       setGenerating(false);
     }
@@ -58,61 +74,79 @@ export default function ExplainScreen() {
     try {
       await saveExplanation(result);
       setSaved(true);
-      Alert.alert("✅ Sauvegardé", "L'explication a été enregistrée.");
+      Alert.alert("✅", t("saved"));
     } catch {
-      Alert.alert("Erreur", "La sauvegarde a échoué.");
+      Alert.alert(t("error"), "La sauvegarde a échoué.");
     }
-  };
-
-  const difficultyColors: Record<string, string> = {
-    facile: "#10B981",
-    moyen: "#F59E0B",
-    difficile: "#EF4444",
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
-        keyboardShouldPersistTaps="handled">
-
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header */}
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-            <Ionicons name="arrow-back" size={24} color="#374151" />
+        <View style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          alignItems: "center", marginBottom: 24,
+        }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+          >
+            <Ionicons
+              name={isRTL ? "arrow-forward" : "arrow-back"}
+              size={24} color="#374151"
+            />
           </TouchableOpacity>
           <View>
-            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
-              Expliquer un texte
+            <Text style={{
+              fontSize: 22, fontWeight: "700", color: "#111827",
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              {t("explain_title_screen")}
             </Text>
             <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-              Analyse IA · GPT-4o-mini
+              {t("generated_by")}
             </Text>
           </View>
         </View>
 
         {/* Input */}
-        <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
-          📝 Texte à expliquer
+        <Text style={{
+          fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 8,
+          textAlign: isRTL ? "right" : "left",
+        }}>
+          📝 {t("text_to_explain")}
         </Text>
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder="Colle ou tape le texte à expliquer..."
+          placeholder={t("text_to_explain") + "..."}
           placeholderTextColor="#9CA3AF"
           multiline
           numberOfLines={6}
+          textAlign={isRTL ? "right" : "left"}
           style={{
             backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
             borderRadius: 12, padding: 14, fontSize: 14, color: "#111827",
             minHeight: 140, textAlignVertical: "top", marginBottom: 20,
+            writingDirection: isRTL ? "rtl" : "ltr",
           }}
         />
 
         {/* Niveau */}
-        <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10 }}>
-          🎯 Niveau d'explication
+        <Text style={{
+          fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10,
+          textAlign: isRTL ? "right" : "left",
+        }}>
+          🎯 {t("level")}
         </Text>
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 24 }}>
+        <View style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          gap: 10, marginBottom: 24,
+        }}>
           {(["facile", "moyen", "difficile"] as const).map((d) => (
             <TouchableOpacity
               key={d}
@@ -128,7 +162,7 @@ export default function ExplainScreen() {
                 fontWeight: "600", fontSize: 13,
                 color: difficulty === d ? "#FFFFFF" : "#374151",
               }}>
-                {d.charAt(0).toUpperCase() + d.slice(1)}
+                {difficultyLabels[d]}
               </Text>
             </TouchableOpacity>
           ))}
@@ -148,14 +182,14 @@ export default function ExplainScreen() {
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <ActivityIndicator color="#FFF" size="small" />
               <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 10 }}>
-                Analyse en cours...
+                {t("explaining")}
               </Text>
             </View>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="bulb-outline" size={20} color="#FFF" />
               <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 8 }}>
-                Expliquer avec l'IA
+                {t("explain_btn")}
               </Text>
             </View>
           )}
@@ -167,12 +201,22 @@ export default function ExplainScreen() {
             {/* Explication */}
             <View style={{
               backgroundColor: "#EEF2FF", borderRadius: 14, padding: 16, marginBottom: 14,
-              borderLeftWidth: 4, borderLeftColor: "#6366F1",
+              borderLeftWidth: isRTL ? 0 : 4,
+              borderRightWidth: isRTL ? 4 : 0,
+              borderLeftColor: "#6366F1",
+              borderRightColor: "#6366F1",
             }}>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: "#3730A3", marginBottom: 8 }}>
-                💡 Explication
+              <Text style={{
+                fontSize: 14, fontWeight: "700", color: "#3730A3", marginBottom: 8,
+                textAlign: isRTL ? "right" : "left",
+              }}>
+                💡 {t("explanation")}
               </Text>
-              <Text style={{ fontSize: 14, color: "#3730A3", lineHeight: 22 }}>
+              <Text style={{
+                fontSize: 14, color: "#3730A3", lineHeight: 22,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}>
                 {result.explanation}
               </Text>
             </View>
@@ -183,20 +227,33 @@ export default function ExplainScreen() {
                 backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
                 marginBottom: 14, borderWidth: 1, borderColor: "#E5E7EB",
               }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 10 }}>
-                  🔑 Points clés
+                <Text style={{
+                  fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 10,
+                  textAlign: isRTL ? "right" : "left",
+                }}>
+                  🔑 {t("key_points")}
                 </Text>
                 {result.keyPoints.map((point, i) => (
-                  <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 6 }}>
+                  <View key={i} style={{
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    alignItems: "flex-start", marginBottom: 6,
+                  }}>
                     <View style={{
                       width: 20, height: 20, borderRadius: 10, backgroundColor: "#EEF2FF",
-                      alignItems: "center", justifyContent: "center", marginRight: 10, marginTop: 1,
+                      alignItems: "center", justifyContent: "center",
+                      marginRight: isRTL ? 0 : 10,
+                      marginLeft: isRTL ? 10 : 0,
+                      marginTop: 1,
                     }}>
                       <Text style={{ fontSize: 11, fontWeight: "700", color: "#6366F1" }}>
                         {i + 1}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 13, color: "#374151", flex: 1, lineHeight: 20 }}>
+                    <Text style={{
+                      fontSize: 13, color: "#374151", flex: 1, lineHeight: 20,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}>
                       {point}
                     </Text>
                   </View>
@@ -205,7 +262,10 @@ export default function ExplainScreen() {
             )}
 
             {/* Badge difficulté */}
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              alignItems: "center", marginBottom: 16,
+            }}>
               <View style={{
                 backgroundColor: difficultyColors[result.difficulty] + "20",
                 borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
@@ -214,13 +274,13 @@ export default function ExplainScreen() {
                   fontSize: 13, fontWeight: "600",
                   color: difficultyColors[result.difficulty],
                 }}>
-                  Niveau : {result.difficulty}
+                  {t("level")} : {difficultyLabels[result.difficulty]}
                 </Text>
               </View>
             </View>
 
             {/* Actions */}
-            <View style={{ flexDirection: "row", gap: 12 }}>
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
               <TouchableOpacity
                 onPress={() => { setResult(null); setSaved(false); setText(""); }}
                 style={{
@@ -229,7 +289,7 @@ export default function ExplainScreen() {
                 }}
               >
                 <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
-                  🔄 Nouveau
+                  🔄 {t("new")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -244,7 +304,7 @@ export default function ExplainScreen() {
                   <ActivityIndicator color="#FFF" size="small" />
                 ) : (
                   <Text style={{ fontWeight: "600", color: "#FFF", fontSize: 15 }}>
-                    {saved ? "✅ Sauvegardé" : "💾 Sauvegarder"}
+                    {saved ? `✅ ${t("saved")}` : `💾 ${t("save")}`}
                   </Text>
                 )}
               </TouchableOpacity>

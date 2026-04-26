@@ -1,4 +1,5 @@
 // app/_layout.tsx
+import "../i18n";
 import { useEffect } from "react";
 import { Stack, router, useSegments } from "expo-router";
 import { useAuthStore } from "@/store/authStore";

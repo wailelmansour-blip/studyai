@@ -12,7 +12,7 @@ export const chatAI = onCall(
       throw new HttpsError("unauthenticated", "Connexion requise.");
     }
 
-    const { message, courseName, history } = request.data;
+    const { message, courseName, history, language = "fr" } = request.data;
 
     if (!message || message.trim().length === 0) {
       throw new HttpsError("invalid-argument", "Message requis.");
@@ -20,6 +20,13 @@ export const chatAI = onCall(
     if (!courseName || courseName.trim().length === 0) {
       throw new HttpsError("invalid-argument", "Cours requis.");
     }
+
+    const langInstruction =
+      language === "ar"
+        ? `أجب باللغة العربية حصراً. إذا كان السؤال غير متعلق بـ "${courseName}"، أعد هذا JSON فقط: {"answer": null, "rejected": true, "reason": "هذا السؤال لا يتعلق بمادة ${courseName}."}`
+        : language === "en"
+        ? `Answer exclusively in English. If the question is NOT related to "${courseName}", return ONLY this JSON: {"answer": null, "rejected": true, "reason": "This question is not related to ${courseName}."}`
+        : `Réponds exclusivement en français. Si la question n'est PAS liée à "${courseName}", retourne UNIQUEMENT ce JSON: {"answer": null, "rejected": true, "reason": "Cette question ne concerne pas le cours de ${courseName}."}`;
 
     const openai = new OpenAI({ apiKey: openaiKey.value() });
 
@@ -37,19 +44,17 @@ export const chatAI = onCall(
 
 RÈGLES STRICTES :
 1. Tu ne réponds QU'aux questions liées à "${courseName}"
-2. Si la question n'est PAS liée à "${courseName}", retourne UNIQUEMENT ce JSON sans rien d'autre :
-   {"answer": null, "rejected": true, "reason": "Cette question ne concerne pas le cours de ${courseName}."}
-3. Si la question EST liée à "${courseName}", retourne UNIQUEMENT ce JSON sans rien d'autre :
+2. ${langInstruction}
+3. Si la question EST liée à "${courseName}", retourne UNIQUEMENT ce JSON :
    {"answer": "ta réponse complète ici", "rejected": false}
-4. INTERDIT : N'écris JAMAIS le mot JSON, ni les balises \`\`\`json dans ta réponse answer
+4. INTERDIT : N'écris JAMAIS le mot JSON, ni les balises dans ta réponse "answer"
 5. Pour les formules mathématiques dans "answer", utilise du texte lisible :
-   - Intégrale : écris "intégrale de f(x)dx" ou "∫f(x)dx"
-   - Fraction : écris "a/b" ou "(numérateur)/(dénominateur)"  
-   - Racine carrée : écris "√x" ou "racine carrée de x"
-   - Somme : écris "Σ" ou "somme de..."
-   - Puissance : écris "x^2" ou "x²"
-6. Réponds dans la même langue que la question
-7. Sois pédagogique, clair et structuré`,
+   - Intégrale : ∫f(x)dx
+   - Fraction : a/b
+   - Racine carrée : √x
+   - Somme : Σ
+   - Puissance : x²
+6. Sois pédagogique, clair et structuré`,
         },
         ...historyMessages,
         { role: "user", content: message },
@@ -63,17 +68,15 @@ RÈGLES STRICTES :
 
     try {
       const parsed = JSON.parse(raw);
-      // Nettoyer answer si elle contient du JSON ou des balises
       if (parsed.answer && typeof parsed.answer === "string") {
         parsed.answer = parsed.answer
           .replace(/```json[\s\S]*?```/g, "")
           .replace(/```[\s\S]*?```/g, "")
-          .replace(/\{[\s\S]*?"answer"[\s\S]*?\}/g, "")
           .trim();
       }
       return parsed;
     } catch {
-      return { answer: raw.replace(/```json|```/g, "").trim(), rejected: false };
+      return { answer: raw, rejected: false };
     }
   }
 );

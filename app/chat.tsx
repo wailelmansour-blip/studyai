@@ -13,32 +13,46 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { useChatStore } from "../store/chatStore";
 import { ChatMessage } from "../types/chat";
+import { useTranslation } from "react-i18next";
+import { useLanguageStore } from "../store/languageStore";
 
-const COURSES = [
+const COURSES_FR = [
   "Mathématiques", "Physique", "Chimie",
   "Histoire", "Géographie", "Biologie",
   "Informatique", "Littérature", "Philosophie", "Anglais",
 ];
 
-// ── Composant rendu du texte avec formatage basique ──
-function MessageText({ content, color }: { content: string; color: string }) {
-  // Sépare le contenu en lignes pour un meilleur rendu
+const COURSES_EN = [
+  "Mathematics", "Physics", "Chemistry",
+  "History", "Geography", "Biology",
+  "Computer Science", "Literature", "Philosophy", "English",
+];
+
+const COURSES_AR = [
+  "الرياضيات", "الفيزياء", "الكيمياء",
+  "التاريخ", "الجغرافيا", "الأحياء",
+  "الإعلام الآلي", "الأدب", "الفلسفة", "الإنجليزية",
+];
+
+// ── Composant rendu du texte ──
+function MessageText({
+  content, color, isRTL,
+}: { content: string; color: string; isRTL: boolean }) {
   const lines = content.split("\n").filter((l) => l.trim() !== "");
   return (
     <View>
       {lines.map((line, i) => {
-        // Titre/étape : ligne commençant par chiffre. ou **
         const isBold = line.startsWith("**") || /^\d+[\.\)]/.test(line);
         const cleaned = line.replace(/\*\*/g, "").trim();
         return (
           <Text
             key={i}
             style={{
-              fontSize: 14,
-              lineHeight: 22,
-              color,
+              fontSize: 14, lineHeight: 22, color,
               fontWeight: isBold ? "700" : "400",
               marginTop: i > 0 ? 4 : 0,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
             {cleaned}
@@ -54,6 +68,14 @@ export default function ChatScreen() {
   const auth = getAuth(app);
   const functions = getFunctions(app, "us-central1");
   const { createSession, addMessage } = useChatStore();
+  const { t } = useTranslation();
+  const { currentLanguage } = useLanguageStore();
+  const isRTL = currentLanguage === "ar";
+
+  const COURSES =
+    currentLanguage === "ar" ? COURSES_AR
+    : currentLanguage === "en" ? COURSES_EN
+    : COURSES_FR;
 
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -68,12 +90,39 @@ export default function ChatScreen() {
     }, 100);
   }, [messages, isTyping]);
 
+  const getWelcomeMessage = (course: string) => {
+    if (currentLanguage === "ar") {
+      return `مرحباً! أنا مساعدك لمادة ${course}.\nاطرح عليّ أي سؤال حول هذه المادة وسأبذل قصارى جهدي لمساعدتك. 📚`;
+    } else if (currentLanguage === "en") {
+      return `Hello! I'm your assistant for ${course}.\nAsk me any question about this subject and I'll do my best to help you. 📚`;
+    }
+    return `Bonjour ! Je suis ton assistant pour le cours de ${course}.\nPose-moi toutes tes questions sur ce sujet et je ferai de mon mieux pour t'aider. 📚`;
+  };
+
+  const getErrorMessage = () => {
+    if (currentLanguage === "ar") return "حدث خطأ. حاول مجدداً.";
+    if (currentLanguage === "en") return "An error occurred. Please try again.";
+    return "Une erreur s'est produite. Réessaie.";
+  };
+
+  const getDefaultRejection = () => {
+    if (currentLanguage === "ar") return "لا يمكنني الإجابة على هذا السؤال خارج الموضوع.";
+    if (currentLanguage === "en") return "I cannot answer this off-topic question.";
+    return "Je ne peux pas répondre à cette question hors-sujet.";
+  };
+
+  const getNoAnswerMessage = () => {
+    if (currentLanguage === "ar") return "لم أتمكن من إنشاء إجابة.";
+    if (currentLanguage === "en") return "I couldn't generate an answer.";
+    return "Je n'ai pas pu générer une réponse.";
+  };
+
   const handleSelectCourse = async (course: string) => {
     setSelectedCourse(course);
     setMessages([{
       id: Date.now().toString(),
       role: "assistant",
-      content: `Bonjour ! Je suis ton assistant pour le cours de ${course}.\nPose-moi toutes tes questions sur ce sujet et je ferai de mon mieux pour t'aider. 📚`,
+      content: getWelcomeMessage(course),
       timestamp: new Date().toISOString(),
     }]);
     try {
@@ -107,6 +156,7 @@ export default function ChatScreen() {
       const res = await fn({
         message: userMessage.content,
         courseName: selectedCourse,
+        language: currentLanguage,
         history: messages.slice(-8).map((m) => ({
           role: m.role,
           content: m.content,
@@ -115,12 +165,10 @@ export default function ChatScreen() {
 
       const data = res.data as any;
 
-      // Nettoyer la réponse — supprimer tout JSON résiduel
       let answerContent = data.rejected
-        ? data.reason || "Je ne peux pas répondre à cette question hors-sujet."
-        : data.answer || "Je n'ai pas pu générer une réponse.";
+        ? data.reason || getDefaultRejection()
+        : data.answer || getNoAnswerMessage();
 
-      // Supprimer les blocs JSON résiduels dans la réponse
       answerContent = answerContent
         .replace(/```json[\s\S]*?```/g, "")
         .replace(/```[\s\S]*?```/g, "")
@@ -147,7 +195,7 @@ export default function ChatScreen() {
       setMessages([...newMessages, {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Une erreur s'est produite. Réessaie.",
+        content: getErrorMessage(),
         timestamp: new Date().toISOString(),
       }]);
     } finally {
@@ -162,36 +210,67 @@ export default function ChatScreen() {
     setMessage("");
   };
 
+  const timeLocale =
+    currentLanguage === "ar" ? "ar-SA"
+    : currentLanguage === "en" ? "en-GB"
+    : "fr-FR";
+
   // ── Sélection du cours ──
   if (!selectedCourse) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
-            <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-              <Ionicons name="arrow-back" size={24} color="#374151" />
+
+          {/* Header */}
+          <View style={{
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", marginBottom: 24,
+          }}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+            >
+              <Ionicons
+                name={isRTL ? "arrow-forward" : "arrow-back"}
+                size={24} color="#374151"
+              />
             </TouchableOpacity>
             <View>
-              <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
-                Chat IA
+              <Text style={{
+                fontSize: 22, fontWeight: "700", color: "#111827",
+                textAlign: isRTL ? "right" : "left",
+              }}>
+                {t("chat_screen_title")}
               </Text>
               <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-                Sélectionne un cours pour commencer
+                {t("select_course")}
               </Text>
             </View>
           </View>
 
+          {/* Info */}
           <View style={{
             backgroundColor: "#EEF2FF", borderRadius: 14,
             padding: 16, marginBottom: 24,
+            borderLeftWidth: isRTL ? 0 : 4,
+            borderRightWidth: isRTL ? 4 : 0,
+            borderLeftColor: "#6366F1",
+            borderRightColor: "#6366F1",
           }}>
-            <Text style={{ fontSize: 14, color: "#3730A3", lineHeight: 22 }}>
-              🔒 Ce chat est limité au cours sélectionné. Les questions hors-sujet seront rejetées pour rester focalisé sur ton apprentissage.
+            <Text style={{
+              fontSize: 14, color: "#3730A3", lineHeight: 22,
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              🔒 {t("chat_locked")}
             </Text>
           </View>
 
-          <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 14 }}>
-            📚 Choisir un cours
+          {/* Liste des cours */}
+          <Text style={{
+            fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 14,
+            textAlign: isRTL ? "right" : "left",
+          }}>
+            📚 {t("choose_course")}
           </Text>
           {COURSES.map((course) => (
             <TouchableOpacity
@@ -199,7 +278,7 @@ export default function ChatScreen() {
               onPress={() => handleSelectCourse(course)}
               style={{
                 backgroundColor: "#FFFFFF", borderRadius: 12, padding: 16,
-                flexDirection: "row", alignItems: "center",
+                flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center",
                 borderWidth: 1, borderColor: "#F3F4F6",
                 marginBottom: 10, elevation: 1,
               }}
@@ -207,14 +286,22 @@ export default function ChatScreen() {
               <View style={{
                 width: 40, height: 40, borderRadius: 10,
                 backgroundColor: "#EEF2FF", alignItems: "center",
-                justifyContent: "center", marginRight: 14,
+                justifyContent: "center",
+                marginRight: isRTL ? 0 : 14,
+                marginLeft: isRTL ? 14 : 0,
               }}>
                 <Ionicons name="book-outline" size={20} color="#6366F1" />
               </View>
-              <Text style={{ fontSize: 15, fontWeight: "600", color: "#111827", flex: 1 }}>
+              <Text style={{
+                fontSize: 15, fontWeight: "600", color: "#111827", flex: 1,
+                textAlign: isRTL ? "right" : "left",
+              }}>
                 {course}
               </Text>
-              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              <Ionicons
+                name={isRTL ? "chevron-back" : "chevron-forward"}
+                size={18} color="#9CA3AF"
+              />
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -233,25 +320,39 @@ export default function ChatScreen() {
         {/* Header */}
         <View style={{
           backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 12,
-          flexDirection: "row", alignItems: "center",
+          flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center",
           borderBottomWidth: 1, borderBottomColor: "#F3F4F6", elevation: 2,
         }}>
-          <TouchableOpacity onPress={handleReset} style={{ marginRight: 12 }}>
-            <Ionicons name="arrow-back" size={24} color="#374151" />
+          <TouchableOpacity
+            onPress={handleReset}
+            style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+          >
+            <Ionicons
+              name={isRTL ? "arrow-forward" : "arrow-back"}
+              size={24} color="#374151"
+            />
           </TouchableOpacity>
           <View style={{
             width: 36, height: 36, borderRadius: 18,
             backgroundColor: "#EEF2FF", alignItems: "center",
-            justifyContent: "center", marginRight: 10,
+            justifyContent: "center",
+            marginRight: isRTL ? 0 : 10,
+            marginLeft: isRTL ? 10 : 0,
           }}>
             <Ionicons name="school" size={18} color="#6366F1" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827" }}>
+            <Text style={{
+              fontSize: 15, fontWeight: "700", color: "#111827",
+              textAlign: isRTL ? "right" : "left",
+            }}>
               {selectedCourse}
             </Text>
-            <Text style={{ fontSize: 12, color: "#10B981" }}>
-              Chat IA · Questions limitées au cours
+            <Text style={{
+              fontSize: 12, color: "#10B981",
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              {t("chat_limited")}
             </Text>
           </View>
           <TouchableOpacity onPress={handleReset} style={{ padding: 4 }}>
@@ -270,7 +371,9 @@ export default function ChatScreen() {
               key={msg.id}
               style={{
                 marginBottom: 14,
-                alignItems: msg.role === "user" ? "flex-end" : "flex-start",
+                alignItems: msg.role === "user"
+                  ? (isRTL ? "flex-start" : "flex-end")
+                  : (isRTL ? "flex-end" : "flex-start"),
               }}
             >
               {msg.role === "assistant" && (
@@ -293,21 +396,27 @@ export default function ChatScreen() {
                   ? "#6366F1"
                   : msg.isRejected ? "#FEF2F2" : "#FFFFFF",
                 borderRadius: 16,
-                borderBottomRightRadius: msg.role === "user" ? 4 : 16,
-                borderBottomLeftRadius: msg.role === "assistant" ? 4 : 16,
-                padding: 12,
-                elevation: 1,
+                borderBottomRightRadius: msg.role === "user" && !isRTL ? 4
+                  : msg.role === "assistant" && isRTL ? 4 : 16,
+                borderBottomLeftRadius: msg.role === "assistant" && !isRTL ? 4
+                  : msg.role === "user" && isRTL ? 4 : 16,
+                padding: 12, elevation: 1,
                 borderWidth: msg.isRejected ? 1 : 0,
                 borderColor: msg.isRejected ? "#FECACA" : "transparent",
               }}>
                 {msg.role === "user" ? (
-                  <Text style={{ fontSize: 14, lineHeight: 22, color: "#FFFFFF" }}>
+                  <Text style={{
+                    fontSize: 14, lineHeight: 22, color: "#FFFFFF",
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}>
                     {msg.content}
                   </Text>
                 ) : (
                   <MessageText
                     content={msg.content}
                     color={msg.isRejected ? "#EF4444" : "#111827"}
+                    isRTL={isRTL}
                   />
                 )}
               </View>
@@ -316,7 +425,7 @@ export default function ChatScreen() {
                 fontSize: 10, color: "#9CA3AF",
                 marginTop: 4, marginHorizontal: 4,
               }}>
-                {new Date(msg.timestamp).toLocaleTimeString("fr-FR", {
+                {new Date(msg.timestamp).toLocaleTimeString(timeLocale, {
                   hour: "2-digit", minute: "2-digit",
                 })}
               </Text>
@@ -325,10 +434,15 @@ export default function ChatScreen() {
 
           {/* Typing indicator */}
           {isTyping && (
-            <View style={{ alignItems: "flex-start", marginBottom: 12 }}>
+            <View style={{
+              alignItems: isRTL ? "flex-end" : "flex-start",
+              marginBottom: 12,
+            }}>
               <View style={{
                 backgroundColor: "#FFFFFF", borderRadius: 16,
-                borderBottomLeftRadius: 4, padding: 14, elevation: 1,
+                borderBottomLeftRadius: isRTL ? 16 : 4,
+                borderBottomRightRadius: isRTL ? 4 : 16,
+                padding: 14, elevation: 1,
               }}>
                 <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
                   {[0, 1, 2].map((i) => (
@@ -346,22 +460,26 @@ export default function ChatScreen() {
         {/* Input */}
         <View style={{
           backgroundColor: "#FFFFFF", padding: 12,
-          flexDirection: "row", alignItems: "flex-end",
+          flexDirection: isRTL ? "row-reverse" : "row", alignItems: "flex-end",
           borderTopWidth: 1, borderTopColor: "#F3F4F6",
         }}>
           <TextInput
             value={message}
             onChangeText={setMessage}
-            placeholder={`Question sur ${selectedCourse}...`}
+            placeholder={`${t("chat_placeholder")} ${selectedCourse}...`}
             placeholderTextColor="#9CA3AF"
             multiline
             maxLength={500}
             onSubmitEditing={handleSend}
+            textAlign={isRTL ? "right" : "left"}
             style={{
               flex: 1, backgroundColor: "#F8F9FA", borderRadius: 20,
               paddingHorizontal: 16, paddingVertical: 10,
               fontSize: 14, color: "#111827", maxHeight: 100,
               borderWidth: 1, borderColor: "#E5E7EB",
+              writingDirection: isRTL ? "rtl" : "ltr",
+              marginLeft: isRTL ? 8 : 0,
+              marginRight: isRTL ? 0 : 8,
             }}
           />
           <TouchableOpacity
@@ -370,14 +488,15 @@ export default function ChatScreen() {
             style={{
               width: 44, height: 44, borderRadius: 22,
               backgroundColor: message.trim() && !isTyping ? "#6366F1" : "#E5E7EB",
-              alignItems: "center", justifyContent: "center", marginLeft: 8,
+              alignItems: "center", justifyContent: "center",
             }}
           >
             {isTyping ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Ionicons
-                name="send" size={18}
+                name={isRTL ? "send" : "send"}
+                size={18}
                 color={message.trim() ? "#FFFFFF" : "#9CA3AF"}
               />
             )}

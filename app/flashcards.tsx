@@ -1,3 +1,4 @@
+// app/flashcards.tsx
 import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -11,13 +12,17 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { FlashcardsResult, Flashcard } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
+import { useTranslation } from "react-i18next";
+import { useLanguageStore } from "../store/languageStore";
 
 export default function FlashcardsScreen() {
   const app = getApp();
   const auth = getAuth(app);
   const functions = getFunctions(app, "us-central1");
   const { saveFlashcards, isLoading } = useAiStore();
-  // ... reste du code identique
+  const { t } = useTranslation();
+  const { currentLanguage } = useLanguageStore();
+  const isRTL = currentLanguage === "ar";
 
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("8");
@@ -29,7 +34,7 @@ export default function FlashcardsScreen() {
 
   const handleGenerate = async () => {
     if (topic.trim().length < 3) {
-      Alert.alert("Erreur", "Saisis un sujet pour les flashcards.");
+      Alert.alert(t("error"), "Saisis un sujet pour les flashcards.");
       return;
     }
     setGenerating(true);
@@ -39,7 +44,7 @@ export default function FlashcardsScreen() {
     setCurrentCard(0);
     try {
       const fn = httpsCallable(functions, "generateFlashcards");
-      const res = await fn({ topic, count: parseInt(count) });
+      const res = await fn({ topic, count: parseInt(count), language: currentLanguage });
       const data = res.data as any;
       setResult({
         userId: auth.currentUser?.uid || "anonymous",
@@ -48,7 +53,7 @@ export default function FlashcardsScreen() {
         createdAt: new Date().toISOString(),
       });
     } catch (e: any) {
-      Alert.alert("Erreur", e.message || "La génération a échoué.");
+      Alert.alert(t("error"), e.message || "La génération a échoué.");
     } finally {
       setGenerating(false);
     }
@@ -59,9 +64,9 @@ export default function FlashcardsScreen() {
     try {
       await saveFlashcards(result);
       setSaved(true);
-      Alert.alert("✅ Sauvegardé", "Les flashcards ont été enregistrées.");
+      Alert.alert("✅", t("saved"));
     } catch {
-      Alert.alert("Erreur", "La sauvegarde a échoué.");
+      Alert.alert(t("error"), "La sauvegarde a échoué.");
     }
   };
 
@@ -74,20 +79,33 @@ export default function FlashcardsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
-        keyboardShouldPersistTaps="handled">
-
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header */}
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-            <Ionicons name="arrow-back" size={24} color="#374151" />
+        <View style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          alignItems: "center", marginBottom: 24,
+        }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+          >
+            <Ionicons
+              name={isRTL ? "arrow-forward" : "arrow-back"}
+              size={24} color="#374151"
+            />
           </TouchableOpacity>
           <View>
-            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
-              Flashcards IA
+            <Text style={{
+              fontSize: 22, fontWeight: "700", color: "#111827",
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              {t("flashcards_title_screen")}
             </Text>
             <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-              Mémorisation · GPT-4o-mini
+              {t("generated_by")}
             </Text>
           </View>
         </View>
@@ -95,25 +113,35 @@ export default function FlashcardsScreen() {
         {/* Form */}
         {!result && (
           <View>
-            <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
-              🧠 Sujet des flashcards
+            <Text style={{
+              fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 8,
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              🧠 {t("topic")}
             </Text>
             <TextInput
               value={topic}
               onChangeText={setTopic}
-              placeholder="Ex: La Révolution française, Les lois de Newton..."
+              placeholder={t("topic") + "..."}
               placeholderTextColor="#9CA3AF"
+              textAlign={isRTL ? "right" : "left"}
               style={{
                 backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
                 borderRadius: 12, padding: 14, fontSize: 14, color: "#111827",
-                marginBottom: 20,
+                marginBottom: 20, writingDirection: isRTL ? "rtl" : "ltr",
               }}
             />
 
-            <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10 }}>
-              🃏 Nombre de cartes
+            <Text style={{
+              fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10,
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              🃏 {t("cards_count")}
             </Text>
-            <View style={{ flexDirection: "row", gap: 10, marginBottom: 28 }}>
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              gap: 10, marginBottom: 28,
+            }}>
               {["5", "8", "10", "15", "20"].map((n) => (
                 <TouchableOpacity
                   key={n}
@@ -146,14 +174,14 @@ export default function FlashcardsScreen() {
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <ActivityIndicator color="#FFF" size="small" />
                   <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 10 }}>
-                    Génération en cours...
+                    {t("generating")}
                   </Text>
                 </View>
               ) : (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons name="layers-outline" size={20} color="#FFF" />
                   <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 8 }}>
-                    Générer les flashcards
+                    {t("generate_flashcards")}
                   </Text>
                 </View>
               )}
@@ -161,23 +189,25 @@ export default function FlashcardsScreen() {
           </View>
         )}
 
-        {/* Résultat — mode carte interactive */}
+        {/* Résultat */}
         {result && card && (
           <View>
             {/* Compteur */}
             <View style={{
-              flexDirection: "row", justifyContent: "space-between",
-              alignItems: "center", marginBottom: 16,
+              flexDirection: isRTL ? "row-reverse" : "row",
+              justifyContent: "space-between", alignItems: "center", marginBottom: 16,
             }}>
               <Text style={{ fontSize: 13, color: "#6B7280" }}>
                 📚 {result.topic}
               </Text>
               <Text style={{ fontSize: 13, fontWeight: "600", color: "#6366F1" }}>
-                {currentCard + 1} / {total}
+                {isRTL
+                  ? `${total} / ${currentCard + 1}`
+                  : `${currentCard + 1} / ${total}`}
               </Text>
             </View>
 
-            {/* Carte principale — tap pour retourner */}
+            {/* Carte principale */}
             <TouchableOpacity
               onPress={() => toggleFlip(currentCard)}
               activeOpacity={0.85}
@@ -195,11 +225,12 @@ export default function FlashcardsScreen() {
                 color: flipped[currentCard] ? "#C7D2FE" : "#9CA3AF",
                 textTransform: "uppercase", letterSpacing: 1,
               }}>
-                {flipped[currentCard] ? "RÉPONSE" : "QUESTION"}
+                {flipped[currentCard] ? t("answer") : t("question")}
               </Text>
               <Text style={{
                 fontSize: 16, fontWeight: "600", textAlign: "center", lineHeight: 24,
                 color: flipped[currentCard] ? "#FFFFFF" : "#111827",
+                writingDirection: isRTL ? "rtl" : "ltr",
               }}>
                 {flipped[currentCard] ? card.answer : card.question}
               </Text>
@@ -207,12 +238,15 @@ export default function FlashcardsScreen() {
                 fontSize: 12, marginTop: 20,
                 color: flipped[currentCard] ? "#C7D2FE" : "#9CA3AF",
               }}>
-                Appuie pour retourner
+                {t("tap_to_flip")}
               </Text>
             </TouchableOpacity>
 
             {/* Navigation */}
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}>
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              gap: 12, marginBottom: 20,
+            }}>
               <TouchableOpacity
                 onPress={() => {
                   if (currentCard > 0) {
@@ -231,7 +265,7 @@ export default function FlashcardsScreen() {
                   fontWeight: "600", fontSize: 15,
                   color: currentCard === 0 ? "#D1D5DB" : "#374151",
                 }}>
-                  ← Précédente
+                  {t("previous")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -253,7 +287,7 @@ export default function FlashcardsScreen() {
                   fontWeight: "600", fontSize: 15,
                   color: currentCard === total - 1 ? "#D1D5DB" : "#FFFFFF",
                 }}>
-                  Suivante →
+                  {t("next_card")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -265,11 +299,14 @@ export default function FlashcardsScreen() {
               <View style={{
                 height: 4, borderRadius: 2, backgroundColor: "#6366F1",
                 width: `${((currentCard + 1) / total) * 100}%`,
+                alignSelf: isRTL ? "flex-end" : "flex-start",
               }} />
             </View>
 
             {/* Actions */}
-            <View style={{ flexDirection: "row", gap: 12 }}>
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row", gap: 12,
+            }}>
               <TouchableOpacity
                 onPress={() => { setResult(null); setSaved(false); setTopic(""); }}
                 style={{
@@ -278,7 +315,7 @@ export default function FlashcardsScreen() {
                 }}
               >
                 <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
-                  🔄 Nouveau
+                  🔄 {t("new")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -293,7 +330,7 @@ export default function FlashcardsScreen() {
                   <ActivityIndicator color="#FFF" size="small" />
                 ) : (
                   <Text style={{ fontWeight: "600", color: "#FFF", fontSize: 15 }}>
-                    {saved ? "✅ Sauvegardé" : "💾 Sauvegarder"}
+                    {saved ? `✅ ${t("saved")}` : `💾 ${t("save")}`}
                   </Text>
                 )}
               </TouchableOpacity>
