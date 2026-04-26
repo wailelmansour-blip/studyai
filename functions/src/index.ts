@@ -13,7 +13,7 @@ const openaiKey = defineSecret("OPENAI_API_KEY");
 
 // ── explainText ───────────────────────────────────────────
 export const explainText = onCall(
-  { region: "us-central1", secrets: [openaiKey] },
+  { region: "us-central1", secrets: [openaiKey], invoker: "public" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
@@ -47,7 +47,7 @@ export const explainText = onCall(
 
 // ── solveExercise ─────────────────────────────────────────
 export const solveExercise = onCall(
-  { region: "us-central1", secrets: [openaiKey] },
+  { region: "us-central1", secrets: [openaiKey], invoker: "public" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
@@ -81,7 +81,7 @@ export const solveExercise = onCall(
 
 // ── generateFlashcards ────────────────────────────────────
 export const generateFlashcards = onCall(
-  { region: "us-central1", secrets: [openaiKey] },
+  { region: "us-central1", secrets: [openaiKey], invoker: "public" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");

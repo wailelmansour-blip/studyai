@@ -9,7 +9,7 @@ export const summarize = onCall(
   {
     secrets: [openaiKey],
     region: "us-central1",
-    enforceAppCheck: false,
+    invoker: "public",
   },
   async (request) => {
     const text = request.data?.text;
