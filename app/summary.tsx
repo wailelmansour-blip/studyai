@@ -33,21 +33,38 @@ export default function SummaryScreen() {
   setSummary("");
   setIsSaved(false);
   try {
-    // Force le refresh du token avant l'appel
     const user = auth.currentUser;
     if (!user) {
       Alert.alert("Erreur", "Tu dois être connecté.");
       return;
     }
-    const token = await user.getIdToken(true); // true = force refresh
-    console.log("Token refreshed:", token.substring(0, 20));
 
-    const fn = httpsCallable(functions, "summarize");
-    const res = await fn({ text: inputText });
-    const data = res.data as any;
-    setSummary(data.summary || data.text || "");
+    // Récupère le token Firebase
+    const token = await user.getIdToken(true);
+
+    // Appel direct à la Cloud Function avec fetch
+    const response = await fetch(
+      "https://us-central1-studyai-82cd7.cloudfunctions.net/summarize",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ data: { text: inputText } }),
+      }
+    );
+
+    const json = await response.json();
+    console.log("Response:", JSON.stringify(json));
+
+    if (json.error) {
+      throw new Error(json.error.message || "Erreur serveur");
+    }
+
+    setSummary(json.result?.summary || json.result?.text || "");
   } catch (e: any) {
-    console.log("Erreur complète:", JSON.stringify(e));
+    console.log("Erreur:", JSON.stringify(e));
     Alert.alert("Erreur", e.message || "La génération a échoué.");
   } finally {
     setIsLoading(false);
