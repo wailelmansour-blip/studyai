@@ -1,3 +1,4 @@
+// functions/src/summarize.ts
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import OpenAI from "openai";
@@ -5,15 +6,12 @@ import OpenAI from "openai";
 const openaiKey = defineSecret("OPENAI_API_KEY");
 
 export const summarize = onCall(
-  { secrets: [openaiKey], region: "us-central1" },
+  {
+    secrets: [openaiKey],
+    region: "us-central1",
+    enforceAppCheck: false,
+  },
   async (request) => {
-
-    // 1. Vérifier que l'utilisateur est connecté
-    /*if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Connexion requise.");
-    }*/
-
-    // 2. Valider l'input
     const text = request.data?.text;
     if (!text || typeof text !== "string") {
       throw new HttpsError("invalid-argument", "Champ 'text' requis.");
@@ -25,16 +23,13 @@ export const summarize = onCall(
       throw new HttpsError("invalid-argument", "Texte trop long (max 50 000 caractères).");
     }
 
-    // 3. Appeler OpenAI
     const openai = new OpenAI({ apiKey: openaiKey.value() });
-
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content:
-            "Tu es un assistant pédagogique. Résume le texte fourni de manière claire et concise en bullet points. Réponds dans la même langue que le texte.",
+          content: "Tu es un assistant pédagogique. Résume le texte fourni de manière claire et concise en bullet points. Réponds dans la même langue que le texte.",
         },
         {
           role: "user",
@@ -46,7 +41,6 @@ export const summarize = onCall(
     });
 
     const summary = completion.choices[0]?.message?.content ?? "";
-
     return { summary };
   }
 );
