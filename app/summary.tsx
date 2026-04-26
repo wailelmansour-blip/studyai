@@ -26,42 +26,20 @@ export default function SummaryScreen() {
 
   const handleSummarize = async () => {
   if (inputText.trim().length < 20) {
-    Alert.alert("Erreur", "Saisis au moins 20 caractères.");
+    Alert.alert("Erreur", "Saisis au moins 20 caractères à résumer.");
     return;
   }
   setIsLoading(true);
   setSummary("");
   setIsSaved(false);
   try {
-    const user = auth.currentUser;
-    if (!user) {
-      Alert.alert("Erreur", "Tu dois être connecté.");
-      return;
-    }
-    const token = await user.getIdToken(true);
-    console.log("Token OK, appel en cours...");
-
-    const response = await fetch(
-      "https://summarize-b5pot3taoq-uc.a.run.app",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ data: { text: inputText } }),
-      }
-    );
-
-    console.log("HTTP Status:", response.status);
-    const rawText = await response.text(); // ← text() au lieu de json()
-    console.log("Raw response:", rawText);
-
-    const json = JSON.parse(rawText);
-    setSummary(json.result?.summary || json.summary || "");
+    const fn = httpsCallable(functions, "summarize");
+    const res = await fn({ text: inputText });
+    const data = res.data as any;
+    setSummary(data.summary || "");
   } catch (e: any) {
-    console.log("Erreur catch:", e.message, JSON.stringify(e));
-    Alert.alert("Erreur", e.message || "Echec.");
+    console.log("Erreur:", JSON.stringify(e));
+    Alert.alert("Erreur", e.message || "La génération a échoué.");
   } finally {
     setIsLoading(false);
   }
