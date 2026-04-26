@@ -38,13 +38,32 @@ export default function SummaryScreen() {
       Alert.alert("Erreur", "Tu dois être connecté.");
       return;
     }
-    await user.getIdToken(true);
-    const fn = httpsCallable(functions, "summarize");
-    const res = await fn({ text: inputText });
-    const data = res.data as any;
-    setSummary(data.summary || "");
+    const token = await user.getIdToken(true);
+
+    // Firebase Functions v2 onCall — format exact requis
+    const response = await fetch(
+      "https://summarize-b5pot3taoq-uc.a.run.app",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          data: { text: inputText },
+        }),
+      }
+    );
+
+    const json = await response.json();
+    console.log("Response brut:", JSON.stringify(json));
+
+    if (json.error) {
+      throw new Error(json.error.message || "Erreur serveur");
+    }
+    setSummary(json.result?.summary || json.result?.text || json.summary || "");
   } catch (e: any) {
-    console.log("Erreur complète:", JSON.stringify(e));
+    console.log("Erreur:", JSON.stringify(e));
     Alert.alert("Erreur", e.message || "La génération a échoué.");
   } finally {
     setIsLoading(false);
