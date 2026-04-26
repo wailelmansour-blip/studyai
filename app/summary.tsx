@@ -26,7 +26,7 @@ export default function SummaryScreen() {
 
   const handleSummarize = async () => {
   if (inputText.trim().length < 20) {
-    Alert.alert("Erreur", "Saisis au moins 20 caractères à résumer.");
+    Alert.alert("Erreur", "Saisis au moins 20 caractères.");
     return;
   }
   setIsLoading(true);
@@ -39,8 +39,8 @@ export default function SummaryScreen() {
       return;
     }
     const token = await user.getIdToken(true);
+    console.log("Token OK, appel en cours...");
 
-    // Firebase Functions v2 onCall — format exact requis
     const response = await fetch(
       "https://summarize-b5pot3taoq-uc.a.run.app",
       {
@@ -49,22 +49,19 @@ export default function SummaryScreen() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          data: { text: inputText },
-        }),
+        body: JSON.stringify({ data: { text: inputText } }),
       }
     );
 
-    const json = await response.json();
-    console.log("Response brut:", JSON.stringify(json));
+    console.log("HTTP Status:", response.status);
+    const rawText = await response.text(); // ← text() au lieu de json()
+    console.log("Raw response:", rawText);
 
-    if (json.error) {
-      throw new Error(json.error.message || "Erreur serveur");
-    }
-    setSummary(json.result?.summary || json.result?.text || json.summary || "");
+    const json = JSON.parse(rawText);
+    setSummary(json.result?.summary || json.summary || "");
   } catch (e: any) {
-    console.log("Erreur:", JSON.stringify(e));
-    Alert.alert("Erreur", e.message || "La génération a échoué.");
+    console.log("Erreur catch:", e.message, JSON.stringify(e));
+    Alert.alert("Erreur", e.message || "Echec.");
   } finally {
     setIsLoading(false);
   }
