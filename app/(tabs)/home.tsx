@@ -22,6 +22,8 @@ const FEATURES: FeatureCard[] = [
   { title: "Expliquer",    subtitle: "Comprends un texte",      icon: "bulb-outline",          color: "#8B5CF6", bg: "#F5F3FF", route: "/explain" },
   { title: "Exercices",    subtitle: "Résous étape par étape",  icon: "calculator-outline",    color: "#EF4444", bg: "#FEF2F2", route: "/solve" },
   { title: "Flashcards",   subtitle: "Mémorise rapidement",     icon: "layers-outline",        color: "#06B6D4", bg: "#ECFEFF", route: "/flashcards" },
+  { title: "Chat IA",      subtitle: "Questions sur ton cours", icon: "chatbubbles-outline",   color: "#F59E0B", bg: "#FFFBEB", route: "/chat" 
+},
 ];
 
 export default function HomeScreen() {

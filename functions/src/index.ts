@@ -7,6 +7,9 @@ import { summarize } from "./summarize";
 import { generateQuiz } from "./quiz";
 import { generatePlan } from "./plan";
 
+import { chatAI } from "./chatAI";
+export { chatAI };
+
 export { summarize, generateQuiz, generatePlan };
 
 const openaiKey = defineSecret("OPENAI_API_KEY");
