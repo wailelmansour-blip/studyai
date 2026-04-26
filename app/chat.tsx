@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, KeyboardAvoidingView,
-  Platform, Alert,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,11 +20,40 @@ const COURSES = [
   "Informatique", "Littérature", "Philosophie", "Anglais",
 ];
 
+// ── Composant rendu du texte avec formatage basique ──
+function MessageText({ content, color }: { content: string; color: string }) {
+  // Sépare le contenu en lignes pour un meilleur rendu
+  const lines = content.split("\n").filter((l) => l.trim() !== "");
+  return (
+    <View>
+      {lines.map((line, i) => {
+        // Titre/étape : ligne commençant par chiffre. ou **
+        const isBold = line.startsWith("**") || /^\d+[\.\)]/.test(line);
+        const cleaned = line.replace(/\*\*/g, "").trim();
+        return (
+          <Text
+            key={i}
+            style={{
+              fontSize: 14,
+              lineHeight: 22,
+              color,
+              fontWeight: isBold ? "700" : "400",
+              marginTop: i > 0 ? 4 : 0,
+            }}
+          >
+            {cleaned}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const app = getApp();
   const auth = getAuth(app);
   const functions = getFunctions(app, "us-central1");
-  const { currentSession, createSession, addMessage } = useChatStore();
+  const { createSession, addMessage } = useChatStore();
 
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -34,7 +63,9 @@ export default function ChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   }, [messages, isTyping]);
 
   const handleSelectCourse = async (course: string) => {
@@ -42,10 +73,9 @@ export default function ChatScreen() {
     setMessages([{
       id: Date.now().toString(),
       role: "assistant",
-      content: `Bonjour ! Je suis ton assistant pour le cours de **${course}**. Pose-moi toutes tes questions sur ce sujet et je ferai de mon mieux pour t'aider. 📚`,
+      content: `Bonjour ! Je suis ton assistant pour le cours de ${course}.\nPose-moi toutes tes questions sur ce sujet et je ferai de mon mieux pour t'aider. 📚`,
       timestamp: new Date().toISOString(),
     }]);
-
     try {
       const user = auth.currentUser;
       if (user) {
@@ -84,12 +114,24 @@ export default function ChatScreen() {
       });
 
       const data = res.data as any;
+
+      // Nettoyer la réponse — supprimer tout JSON résiduel
+      let answerContent = data.rejected
+        ? data.reason || "Je ne peux pas répondre à cette question hors-sujet."
+        : data.answer || "Je n'ai pas pu générer une réponse.";
+
+      // Supprimer les blocs JSON résiduels dans la réponse
+      answerContent = answerContent
+        .replace(/```json[\s\S]*?```/g, "")
+        .replace(/```[\s\S]*?```/g, "")
+        .replace(/\{\s*"answer"\s*:[\s\S]*?\}/g, "")
+        .replace(/\{\s*"rejected"\s*:[\s\S]*?\}/g, "")
+        .trim();
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.rejected
-          ? data.reason || "Je ne peux pas répondre à cette question."
-          : data.answer || "Je n'ai pas pu générer une réponse.",
+        content: answerContent,
         timestamp: new Date().toISOString(),
         isRejected: data.rejected,
       };
@@ -97,19 +139,17 @@ export default function ChatScreen() {
       const finalMessages = [...newMessages, assistantMessage];
       setMessages(finalMessages);
 
-      // Sauvegarder dans Firestore
       if (sessionId) {
         await addMessage(sessionId, userMessage);
         await addMessage(sessionId, assistantMessage);
       }
     } catch (e: any) {
-      const errorMessage: ChatMessage = {
+      setMessages([...newMessages, {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: "Une erreur s'est produite. Réessaie.",
         timestamp: new Date().toISOString(),
-      };
-      setMessages([...newMessages, errorMessage]);
+      }]);
     } finally {
       setIsTyping(false);
     }
@@ -145,7 +185,7 @@ export default function ChatScreen() {
             backgroundColor: "#EEF2FF", borderRadius: 14,
             padding: 16, marginBottom: 24,
           }}>
-            <Text style={{ fontSize: 14, color: "#3730A3", lineHeight: 20 }}>
+            <Text style={{ fontSize: 14, color: "#3730A3", lineHeight: 22 }}>
               🔒 Ce chat est limité au cours sélectionné. Les questions hors-sujet seront rejetées pour rester focalisé sur ton apprentissage.
             </Text>
           </View>
@@ -194,8 +234,7 @@ export default function ChatScreen() {
         <View style={{
           backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 12,
           flexDirection: "row", alignItems: "center",
-          borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
-          elevation: 2,
+          borderBottomWidth: 1, borderBottomColor: "#F3F4F6", elevation: 2,
         }}>
           <TouchableOpacity onPress={handleReset} style={{ marginRight: 12 }}>
             <Ionicons name="arrow-back" size={24} color="#374151" />
@@ -223,14 +262,14 @@ export default function ChatScreen() {
         {/* Messages */}
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
           keyboardShouldPersistTaps="handled"
         >
           {messages.map((msg) => (
             <View
               key={msg.id}
               style={{
-                marginBottom: 12,
+                marginBottom: 14,
                 alignItems: msg.role === "user" ? "flex-end" : "flex-start",
               }}
             >
@@ -238,8 +277,7 @@ export default function ChatScreen() {
                 <View style={{
                   width: 28, height: 28, borderRadius: 14,
                   backgroundColor: msg.isRejected ? "#FEF2F2" : "#EEF2FF",
-                  alignItems: "center", justifyContent: "center",
-                  marginBottom: 4,
+                  alignItems: "center", justifyContent: "center", marginBottom: 4,
                 }}>
                   <Ionicons
                     name={msg.isRejected ? "close-circle" : "school"}
@@ -248,8 +286,9 @@ export default function ChatScreen() {
                   />
                 </View>
               )}
+
               <View style={{
-                maxWidth: "80%",
+                maxWidth: "82%",
                 backgroundColor: msg.role === "user"
                   ? "#6366F1"
                   : msg.isRejected ? "#FEF2F2" : "#FFFFFF",
@@ -261,18 +300,21 @@ export default function ChatScreen() {
                 borderWidth: msg.isRejected ? 1 : 0,
                 borderColor: msg.isRejected ? "#FECACA" : "transparent",
               }}>
-                <Text style={{
-                  fontSize: 14, lineHeight: 20,
-                  color: msg.role === "user"
-                    ? "#FFFFFF"
-                    : msg.isRejected ? "#EF4444" : "#111827",
-                }}>
-                  {msg.content}
-                </Text>
+                {msg.role === "user" ? (
+                  <Text style={{ fontSize: 14, lineHeight: 22, color: "#FFFFFF" }}>
+                    {msg.content}
+                  </Text>
+                ) : (
+                  <MessageText
+                    content={msg.content}
+                    color={msg.isRejected ? "#EF4444" : "#111827"}
+                  />
+                )}
               </View>
+
               <Text style={{
-                fontSize: 10, color: "#9CA3AF", marginTop: 4,
-                marginHorizontal: 4,
+                fontSize: 10, color: "#9CA3AF",
+                marginTop: 4, marginHorizontal: 4,
               }}>
                 {new Date(msg.timestamp).toLocaleTimeString("fr-FR", {
                   hour: "2-digit", minute: "2-digit",
@@ -314,6 +356,7 @@ export default function ChatScreen() {
             placeholderTextColor="#9CA3AF"
             multiline
             maxLength={500}
+            onSubmitEditing={handleSend}
             style={{
               flex: 1, backgroundColor: "#F8F9FA", borderRadius: 20,
               paddingHorizontal: 16, paddingVertical: 10,
@@ -327,16 +370,14 @@ export default function ChatScreen() {
             style={{
               width: 44, height: 44, borderRadius: 22,
               backgroundColor: message.trim() && !isTyping ? "#6366F1" : "#E5E7EB",
-              alignItems: "center", justifyContent: "center",
-              marginLeft: 8,
+              alignItems: "center", justifyContent: "center", marginLeft: 8,
             }}
           >
             {isTyping ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Ionicons
-                name="send"
-                size={18}
+                name="send" size={18}
                 color={message.trim() ? "#FFFFFF" : "#9CA3AF"}
               />
             )}
