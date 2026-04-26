@@ -14,6 +14,8 @@ import { FlashcardsResult, Flashcard } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
+import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
+import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
 
 export default function FlashcardsScreen() {
   const app = getApp();
@@ -23,6 +25,7 @@ export default function FlashcardsScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
+  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
 
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("8");
@@ -37,6 +40,10 @@ export default function FlashcardsScreen() {
       Alert.alert(t("error"), "Saisis un sujet pour les flashcards.");
       return;
     }
+
+    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
+    if (!allowed) return;                    // ← AJOUT Phase 14
+
     setGenerating(true);
     setResult(null);
     setSaved(false);
@@ -109,6 +116,9 @@ export default function FlashcardsScreen() {
             </Text>
           </View>
         </View>
+
+        {/* ── Phase 14 : Bandeau usage ── */}
+        <UsageBanner isRTL={isRTL} />
 
         {/* Form */}
         {!result && (

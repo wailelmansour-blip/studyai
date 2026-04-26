@@ -14,6 +14,8 @@ import { SolveResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
+import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
+import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
 
 export default function SolveScreen() {
   const app = getApp();
@@ -23,6 +25,7 @@ export default function SolveScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
+  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
 
   const [exercise, setExercise] = useState("");
   const [subject, setSubject] = useState("");
@@ -42,6 +45,10 @@ export default function SolveScreen() {
       Alert.alert(t("error"), "Saisis l'exercice à résoudre.");
       return;
     }
+
+    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
+    if (!allowed) return;                    // ← AJOUT Phase 14
+
     setGenerating(true);
     setResult(null);
     setSaved(false);
@@ -107,6 +114,9 @@ export default function SolveScreen() {
             </Text>
           </View>
         </View>
+
+        {/* ── Phase 14 : Bandeau usage ── */}
+        <UsageBanner isRTL={isRTL} />
 
         {/* Matière */}
         <Text style={{

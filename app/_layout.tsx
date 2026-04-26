@@ -3,15 +3,22 @@ import "../i18n";
 import { useEffect } from "react";
 import { Stack, router, useSegments } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
+import { useUsageStore } from "@/store/usageStore"; // ← AJOUT Phase 14
 
 export default function RootLayout() {
   const { user, isInitialized, initialize } = useAuthStore();
+  const { loadUsage } = useUsageStore(); // ← AJOUT Phase 14
   const segments = useSegments();
 
   useEffect(() => {
     const unsubscribe = initialize();
     return unsubscribe;
   }, []);
+
+  // ← AJOUT Phase 14 : charge l'usage dès que l'user est connecté
+  useEffect(() => {
+    if (user) loadUsage();
+  }, [user]);
 
   useEffect(() => {
     if (!isInitialized) return;

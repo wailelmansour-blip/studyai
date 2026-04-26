@@ -14,6 +14,8 @@ import { getAuth } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
+import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
+import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
 
 const CACHE_KEY = "studyai_summaries";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -36,6 +38,7 @@ export default function SummaryScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
+  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
 
   const [inputText, setInputText] = useState("");
   const [summary, setSummary] = useState("");
@@ -68,6 +71,10 @@ export default function SummaryScreen() {
       Alert.alert(t("error"), "Saisis au moins 20 caractères à résumer.");
       return;
     }
+
+    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
+    if (!allowed) return;                    // ← AJOUT Phase 14
+
     setIsLoading(true);
     setSummary("");
     setIsSaved(false);
@@ -168,6 +175,9 @@ export default function SummaryScreen() {
             </Text>
           </View>
         </View>
+
+        {/* ── Phase 14 : Bandeau usage ── */}
+        <UsageBanner isRTL={isRTL} />
 
         {/* Cache badge */}
         {isFromCache && (

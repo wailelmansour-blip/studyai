@@ -12,6 +12,8 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
+import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
+import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
 
 interface QuizQuestion {
   question: string;
@@ -27,6 +29,7 @@ export default function QuizScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
+  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
 
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("5");
@@ -64,6 +67,10 @@ export default function QuizScreen() {
       Alert.alert(t("error"), "Saisis un sujet pour le quiz.");
       return;
     }
+
+    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
+    if (!allowed) return;                    // ← AJOUT Phase 14
+
     setGenerating(true);
     try {
       const fn = httpsCallable(functions, "generateQuiz");
@@ -147,6 +154,9 @@ export default function QuizScreen() {
             </Text>
           </View>
         </View>
+
+        {/* ── Phase 14 : Bandeau usage ── */}
+        <UsageBanner isRTL={isRTL} />
 
         {/* Setup */}
         {phase === "setup" && (
@@ -235,8 +245,6 @@ export default function QuizScreen() {
               <Text style={{ fontSize: 13, color: "#6B7280" }}>
                 {currentLanguage === "ar"
                   ? `سؤال ${currentIndex + 1}/${questions.length}`
-                  : currentLanguage === "en"
-                  ? `Question ${currentIndex + 1}/${questions.length}`
                   : `Question ${currentIndex + 1}/${questions.length}`}
               </Text>
               <Text style={{ fontSize: 13, fontWeight: "600", color: "#6366F1" }}>

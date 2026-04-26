@@ -14,6 +14,8 @@ import { ExplainResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
+import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
+import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
 
 export default function ExplainScreen() {
   const app = getApp();
@@ -23,6 +25,7 @@ export default function ExplainScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
+  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
 
   const [text, setText] = useState("");
   const [difficulty, setDifficulty] = useState<"facile" | "moyen" | "difficile">("moyen");
@@ -47,6 +50,10 @@ export default function ExplainScreen() {
       Alert.alert(t("error"), "Saisis au moins 10 caractères.");
       return;
     }
+
+    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
+    if (!allowed) return;                    // ← AJOUT Phase 14
+
     setGenerating(true);
     setResult(null);
     setSaved(false);
@@ -112,6 +119,9 @@ export default function ExplainScreen() {
             </Text>
           </View>
         </View>
+
+        {/* ── Phase 14 : Bandeau usage ── */}
+        <UsageBanner isRTL={isRTL} />
 
         {/* Input */}
         <Text style={{

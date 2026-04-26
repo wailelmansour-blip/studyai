@@ -15,6 +15,8 @@ import { usePlanStore } from "../store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "../types/plan";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
+import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
+import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
 
 export default function PlanScreen() {
   const app = getApp();
@@ -24,6 +26,7 @@ export default function PlanScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
+  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
 
   const [subjects, setSubjects] = useState<string[]>([""]);
   const [examDate, setExamDate] = useState<Date>(
@@ -77,6 +80,9 @@ export default function PlanScreen() {
       Alert.alert(t("error"), "Heures par jour : entre 0.5 et 12.");
       return;
     }
+
+    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
+    if (!allowed) return;                    // ← AJOUT Phase 14
 
     setGenerating(true);
     setGeneratedPlan(null);
@@ -176,6 +182,9 @@ export default function PlanScreen() {
             </Text>
           </View>
         </View>
+
+        {/* ── Phase 14 : Bandeau usage ── */}
+        <UsageBanner isRTL={isRTL} />
 
         {/* Form */}
         {!generatedPlan && (

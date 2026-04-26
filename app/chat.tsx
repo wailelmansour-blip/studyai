@@ -15,6 +15,8 @@ import { useChatStore } from "../store/chatStore";
 import { ChatMessage } from "../types/chat";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
+import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
+import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
 
 const COURSES_FR = [
   "Mathématiques", "Physique", "Chimie",
@@ -34,7 +36,6 @@ const COURSES_AR = [
   "الإعلام الآلي", "الأدب", "الفلسفة", "الإنجليزية",
 ];
 
-// ── Composant rendu du texte ──
 function MessageText({
   content, color, isRTL,
 }: { content: string; color: string; isRTL: boolean }) {
@@ -71,6 +72,7 @@ export default function ChatScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
+  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
 
   const COURSES =
     currentLanguage === "ar" ? COURSES_AR
@@ -138,6 +140,10 @@ export default function ChatScreen() {
 
   const handleSend = async () => {
     if (!message.trim() || !selectedCourse || isTyping) return;
+
+    // ── Phase 14 : vérifier la limite avant l'appel IA ──
+    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
+    if (!allowed) return;                    // ← AJOUT Phase 14
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -247,6 +253,9 @@ export default function ChatScreen() {
               </Text>
             </View>
           </View>
+
+          {/* ── Phase 14 : Bandeau usage ── */}
+          <UsageBanner isRTL={isRTL} />
 
           {/* Info */}
           <View style={{
