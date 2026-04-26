@@ -1,5 +1,5 @@
 // app/summary.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -11,8 +11,21 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { collection, addDoc, Timestamp, getFirestore } from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
+
+const CACHE_KEY = "studyai_summaries";
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+
+interface CachedSummary {
+  id: string;
+  userId: string;
+  originalText: string;
+  summary: string;
+  language: string;
+  createdAt: string;
+}
 
 export default function SummaryScreen() {
   const app = getApp();
@@ -21,11 +34,35 @@ export default function SummaryScreen() {
   const functions = getFunctions(app, "us-central1");
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
+  const isRTL = currentLanguage === "ar";
 
   const [inputText, setInputText] = useState("");
   const [summary, setSummary] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [cachedSummaries, setCachedSummaries] = useState<CachedSummary[]>([]);
+  const [isFromCache, setIsFromCache] = useState(false);
+
+  // ── Charger le cache au démarrage ──
+  useEffect(() => {
+    const loadCache = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data, timestamp } = JSON.parse(raw);
+          if (Date.now() - timestamp < CACHE_TTL) {
+            setCachedSummaries(data || []);
+            console.log(`Cache chargé: ${data?.length} résumés`);
+          }
+        }
+      } catch (e) {
+        console.log("Cache load error:", e);
+      }
+    };
+    loadCache();
+  }, []);
 
   const handleSummarize = async () => {
     if (inputText.trim().length < 20) {
@@ -35,6 +72,7 @@ export default function SummaryScreen() {
     setIsLoading(true);
     setSummary("");
     setIsSaved(false);
+    setIsFromCache(false);
     try {
       const fn = httpsCallable(functions, "summarize");
       const res = await fn({ text: inputText, language: currentLanguage });
@@ -51,13 +89,29 @@ export default function SummaryScreen() {
     if (!summary) return;
     try {
       const user = auth.currentUser;
-      await addDoc(collection(db, "summaries"), {
+      const newEntry: CachedSummary = {
+        id: Date.now().toString(),
         userId: user?.uid || "anonymous",
         originalText: inputText,
         summary,
         language: currentLanguage,
+        createdAt: new Date().toISOString(),
+      };
+
+      // 1. Sauvegarder dans Firestore
+      await addDoc(collection(db, "summaries"), {
+        ...newEntry,
         createdAt: Timestamp.now(),
       });
+
+      // 2. Mettre à jour le cache local
+      const updated = [newEntry, ...cachedSummaries];
+      setCachedSummaries(updated);
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user?.uid}`,
+        JSON.stringify({ data: updated, timestamp: Date.now() })
+      );
+
       setIsSaved(true);
       Alert.alert("✅", t("saved"));
     } catch {
@@ -65,7 +119,13 @@ export default function SummaryScreen() {
     }
   };
 
-  const isRTL = currentLanguage === "ar";
+  // Charger un résumé depuis le cache
+  const handleLoadFromCache = (item: CachedSummary) => {
+    setInputText(item.originalText);
+    setSummary(item.summary);
+    setIsSaved(true);
+    setIsFromCache(true);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
@@ -87,7 +147,7 @@ export default function SummaryScreen() {
               size={24} color="#374151"
             />
           </TouchableOpacity>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={{
               fontSize: 22, fontWeight: "700", color: "#111827",
               textAlign: isRTL ? "right" : "left",
@@ -102,6 +162,22 @@ export default function SummaryScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Cache badge */}
+        {isFromCache && (
+          <View style={{
+            backgroundColor: "#F0FDF4", borderRadius: 8, padding: 8,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", marginBottom: 16, gap: 6,
+          }}>
+            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+            <Text style={{ fontSize: 13, color: "#065F46" }}>
+              {currentLanguage === "ar" ? "محمّل من الذاكرة المحلية"
+                : currentLanguage === "en" ? "Loaded from local cache"
+                : "Chargé depuis le cache local"}
+            </Text>
+          </View>
+        )}
 
         {/* Input label */}
         <Text style={{
@@ -184,7 +260,10 @@ export default function SummaryScreen() {
             {/* Actions */}
             <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
               <TouchableOpacity
-                onPress={() => { setSummary(""); setInputText(""); setIsSaved(false); }}
+                onPress={() => {
+                  setSummary(""); setInputText("");
+                  setIsSaved(false); setIsFromCache(false);
+                }}
                 style={{
                   flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
                   backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
@@ -207,6 +286,50 @@ export default function SummaryScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {/* Historique cache */}
+        {cachedSummaries.length > 0 && summary === "" && (
+          <View style={{ marginTop: 8 }}>
+            <Text style={{
+              fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              🕒 {currentLanguage === "ar" ? "الملخصات المحفوظة"
+                : currentLanguage === "en" ? "Saved Summaries"
+                : "Résumés sauvegardés"}
+            </Text>
+            {cachedSummaries.slice(0, 5).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => handleLoadFromCache(item)}
+                style={{
+                  backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
+                  marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB",
+                  elevation: 1,
+                }}
+              >
+                <Text style={{
+                  fontSize: 13, color: "#374151", lineHeight: 18,
+                  numberOfLines: 2,
+                  textAlign: isRTL ? "right" : "left",
+                } as any}
+                  numberOfLines={2}
+                >
+                  {item.summary}
+                </Text>
+                <Text style={{
+                  fontSize: 11, color: "#9CA3AF", marginTop: 6,
+                  textAlign: isRTL ? "right" : "left",
+                }}>
+                  {new Date(item.createdAt).toLocaleDateString(
+                    currentLanguage === "ar" ? "ar-SA"
+                    : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                  )}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
       </ScrollView>
