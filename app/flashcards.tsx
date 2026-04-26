@@ -1,4 +1,3 @@
-// app/flashcards.tsx
 import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -7,22 +6,18 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-/*import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth } from "firebase/auth";
-import { app } from "@/lib/firebase";
-import { useAiStore } from "@/store/aiStore";
-import { FlashcardsResult, Flashcard } from "@/types/ai";*/
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import app from "../src/services/firebase";
-import { useAiStore } from "../store/aiStore";
 import { FlashcardsResult, Flashcard } from "../types/ai";
-
-const functions = getFunctions(app, "us-central1");
+import { useAiStore } from "../store/aiStore";
 
 export default function FlashcardsScreen() {
-  const { saveFlashcards, isLoading } = useAiStore();
+  const app = getApp();
   const auth = getAuth(app);
+  const functions = getFunctions(app, "us-central1");
+  const { saveFlashcards, isLoading } = useAiStore();
+  // ... reste du code identique
 
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("8");

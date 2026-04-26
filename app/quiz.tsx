@@ -8,10 +8,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import app from "../src/config/firebase";
-
-const functions = getFunctions(app, "us-central1");
 
 interface QuizQuestion {
   question: string;
@@ -21,7 +19,10 @@ interface QuizQuestion {
 }
 
 export default function QuizScreen() {
+  const app = getApp();
   const auth = getAuth(app);
+  const functions = getFunctions(app, "us-central1");
+
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("5");
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -162,7 +163,6 @@ export default function QuizScreen() {
         {/* Playing */}
         {phase === "playing" && q && (
           <View>
-            {/* Progression */}
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
               <Text style={{ fontSize: 13, color: "#6B7280" }}>
                 Question {currentIndex + 1}/{questions.length}
@@ -178,7 +178,6 @@ export default function QuizScreen() {
               }} />
             </View>
 
-            {/* Question */}
             <View style={{
               backgroundColor: "#EEF2FF", borderRadius: 14, padding: 20, marginBottom: 20,
             }}>
@@ -187,11 +186,8 @@ export default function QuizScreen() {
               </Text>
             </View>
 
-            {/* Options */}
             {q.options.map((option, i) => {
-              let bg = "#FFF";
-              let border = "#E5E7EB";
-              let textColor = "#374151";
+              let bg = "#FFF", border = "#E5E7EB", textColor = "#374151";
               if (showAnswer) {
                 if (i === q.correct) { bg = "#F0FDF4"; border = "#10B981"; textColor = "#065F46"; }
                 else if (i === selectedAnswer) { bg = "#FEF2F2"; border = "#EF4444"; textColor = "#991B1B"; }
@@ -223,7 +219,6 @@ export default function QuizScreen() {
               );
             })}
 
-            {/* Explication */}
             {showAnswer && q.explanation && (
               <View style={{
                 backgroundColor: "#FFFBEB", borderRadius: 12, padding: 14,

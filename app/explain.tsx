@@ -1,4 +1,3 @@
-// app/explain.tsx
 import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -8,21 +7,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { getFirestore, collection, addDoc, Timestamp } from "firebase/firestore";
+import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-/*import { app } from "@/lib/firebase";
-import { useAiStore } from "@/store/aiStore";
-import { ExplainResult } from "@/types/ai";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth } from "firebase/auth";*/
-import app from "../src/services/firebase";
-import { useAiStore } from "../store/aiStore";
 import { ExplainResult } from "../types/ai";
-
-const functions = getFunctions(app, "us-central1");
+import { useAiStore } from "../store/aiStore";
 
 export default function ExplainScreen() {
-  const { saveExplanation, isLoading } = useAiStore();
+  const app = getApp();
   const auth = getAuth(app);
+  const functions = getFunctions(app, "us-central1");
+  const { saveExplanation, isLoading } = useAiStore();
+  // ... reste du code identique
 
   const [text, setText] = useState("");
   const [difficulty, setDifficulty] = useState<"facile" | "moyen" | "difficile">("moyen");

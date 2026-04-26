@@ -1,17 +1,12 @@
 // store/planStore.ts
 import { create } from "zustand";
 import {
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  Timestamp,
+  collection, addDoc, getDocs,
+  query, where, orderBy, Timestamp,
+  getFirestore,
 } from "firebase/firestore";
-//import { db } from "@/lib/firebase";
+import { getApp } from "firebase/app";
 import { StudyPlan } from "../types/plan";
-import { db } from "../src/lib/firebase";
 
 interface PlanState {
   plans: StudyPlan[];
@@ -24,7 +19,7 @@ interface PlanState {
   clearError: () => void;
 }
 
-export const usePlanStore = create<PlanState>((set, get) => ({
+export const usePlanStore = create<PlanState>((set) => ({
   plans: [],
   currentPlan: null,
   isLoading: false,
@@ -32,42 +27,37 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
   setCurrentPlan: (plan) => set({ currentPlan: plan }),
 
-  savePlan: async (plan: StudyPlan) => {
+  savePlan: async (plan) => {
     set({ isLoading: true, error: null });
     try {
-      const docRef = await addDoc(collection(db, "plans"), {
+      const db = getFirestore(getApp());
+      const ref = await addDoc(collection(db, "plans"), {
         ...plan,
         createdAt: Timestamp.now(),
       });
-      const savedPlan = { ...plan, id: docRef.id };
-      set((state) => ({
-        plans: [savedPlan, ...state.plans],
-        currentPlan: savedPlan,
-        isLoading: false,
-      }));
-      return docRef.id;
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      throw error;
+      const saved = { ...plan, id: ref.id };
+      set((s) => ({ plans: [saved, ...s.plans], currentPlan: saved, isLoading: false }));
+      return ref.id;
+    } catch (e: any) {
+      set({ error: e.message, isLoading: false });
+      throw e;
     }
   },
 
-  fetchPlans: async (userId: string) => {
+  fetchPlans: async (userId) => {
     set({ isLoading: true, error: null });
     try {
+      const db = getFirestore(getApp());
       const q = query(
         collection(db, "plans"),
         where("userId", "==", userId),
         orderBy("createdAt", "desc")
       );
-      const snapshot = await getDocs(q);
-      const plans: StudyPlan[] = snapshot.docs.map((doc) => ({
-        ...(doc.data() as StudyPlan),
-        id: doc.id,
-      }));
+      const snap = await getDocs(q);
+      const plans = snap.docs.map((d) => ({ ...(d.data() as StudyPlan), id: d.id }));
       set({ plans, isLoading: false });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
+    } catch (e: any) {
+      set({ error: e.message, isLoading: false });
     }
   },
 

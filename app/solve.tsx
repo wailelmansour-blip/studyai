@@ -1,4 +1,3 @@
-// app/solve.tsx
 import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -8,22 +7,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-/*import { app } from "@/lib/firebase";
-import { useAiStore } from "@/store/aiStore";
-import { SolveResult } from "@/types/ai";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth } from "firebase/auth";*/
-import app from "../src/services/firebase";
-import { useAiStore } from "../store/aiStore";
 import { SolveResult } from "../types/ai";
-
-const functions = getFunctions(app, "us-central1");
+import { useAiStore } from "../store/aiStore";
 
 export default function SolveScreen() {
-  const { saveSolution, isLoading } = useAiStore();
+  const app = getApp();
   const auth = getAuth(app);
-
+  const functions = getFunctions(app, "us-central1");
+  const { saveSolution, isLoading } = useAiStore();
+  // ... reste du code identique
   const [exercise, setExercise] = useState("");
   const [subject, setSubject] = useState("");
   const [result, setResult] = useState<SolveResult | null>(null);

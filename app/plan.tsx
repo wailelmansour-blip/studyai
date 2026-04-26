@@ -1,35 +1,24 @@
-// app/plan.tsx
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  Platform,
+  View, Text, TextInput, TouchableOpacity,
+  ScrollView, ActivityIndicator, Alert, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-/*import { app } from "@/lib/firebase";
-import { usePlanStore } from "@/store/planStore";
-import { StudyPlan, StudySession, GeneratePlanInput } from "@/types/plan";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth } from "firebase/auth";*/
-import app from "../src/services/firebase";
 import { usePlanStore } from "../store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "../types/plan";
 
-const functions = getFunctions(app, "us-central1");
-
 export default function PlanScreen() {
-  const { savePlan, isLoading } = usePlanStore();
+  const app = getApp();
   const auth = getAuth(app);
+  const functions = getFunctions(app, "us-central1");
+  const { savePlan, isLoading } = usePlanStore();
+  // ... reste du code identique
 
   // --- Form state ---
   const [subjects, setSubjects] = useState<string[]>([""]);

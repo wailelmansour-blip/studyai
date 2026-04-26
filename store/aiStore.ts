@@ -1,9 +1,8 @@
 // store/aiStore.ts
 import { create } from "zustand";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
-//import { db } from "@/lib/firebase";
+import { collection, addDoc, Timestamp, getFirestore } from "firebase/firestore";
+import { getApp } from "firebase/app";
 import { ExplainResult, SolveResult, FlashcardsResult } from "../types/ai";
-import { db } from "../src/lib/firebase";
 
 interface AiState {
   isLoading: boolean;
@@ -21,6 +20,7 @@ export const useAiStore = create<AiState>((set) => ({
   saveExplanation: async (data) => {
     set({ isLoading: true, error: null });
     try {
+      const db = getFirestore(getApp());
       const ref = await addDoc(collection(db, "explanations"), {
         ...data,
         createdAt: Timestamp.now(),
@@ -36,6 +36,7 @@ export const useAiStore = create<AiState>((set) => ({
   saveSolution: async (data) => {
     set({ isLoading: true, error: null });
     try {
+      const db = getFirestore(getApp());
       const ref = await addDoc(collection(db, "solutions"), {
         ...data,
         createdAt: Timestamp.now(),
@@ -51,6 +52,7 @@ export const useAiStore = create<AiState>((set) => ({
   saveFlashcards: async (data) => {
     set({ isLoading: true, error: null });
     try {
+      const db = getFirestore(getApp());
       const ref = await addDoc(collection(db, "flashcards"), {
         ...data,
         createdAt: Timestamp.now(),
