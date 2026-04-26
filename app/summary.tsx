@@ -16,7 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 
 const CACHE_KEY = "studyai_summaries";
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+const MAX_CACHE_ITEMS = 5;
 
 interface CachedSummary {
   id: string;
@@ -43,7 +44,6 @@ export default function SummaryScreen() {
   const [cachedSummaries, setCachedSummaries] = useState<CachedSummary[]>([]);
   const [isFromCache, setIsFromCache] = useState(false);
 
-  // ── Charger le cache au démarrage ──
   useEffect(() => {
     const loadCache = async () => {
       try {
@@ -54,7 +54,6 @@ export default function SummaryScreen() {
           const { data, timestamp } = JSON.parse(raw);
           if (Date.now() - timestamp < CACHE_TTL) {
             setCachedSummaries(data || []);
-            console.log(`Cache chargé: ${data?.length} résumés`);
           }
         }
       } catch (e) {
@@ -87,39 +86,46 @@ export default function SummaryScreen() {
 
   const handleSave = async () => {
     if (!summary) return;
+
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert(t("error"), "Tu dois être connecté pour sauvegarder.");
+      return;
+    }
+
     try {
-      const user = auth.currentUser;
       const newEntry: CachedSummary = {
         id: Date.now().toString(),
-        userId: user?.uid || "anonymous",
+        userId: user.uid,
         originalText: inputText,
         summary,
         language: currentLanguage,
         createdAt: new Date().toISOString(),
       };
 
-      // 1. Sauvegarder dans Firestore
       await addDoc(collection(db, "summaries"), {
         ...newEntry,
         createdAt: Timestamp.now(),
       });
 
-      // 2. Mettre à jour le cache local
-      const updated = [newEntry, ...cachedSummaries];
+      const updated = [newEntry, ...cachedSummaries].slice(0, MAX_CACHE_ITEMS);
       setCachedSummaries(updated);
       await AsyncStorage.setItem(
-        `${CACHE_KEY}_${user?.uid}`,
+        `${CACHE_KEY}_${user.uid}`,
         JSON.stringify({ data: updated, timestamp: Date.now() })
       );
 
       setIsSaved(true);
       Alert.alert("✅", t("saved"));
-    } catch {
-      Alert.alert(t("error"), "La sauvegarde a échoué.");
+    } catch (e: any) {
+      console.error("Erreur sauvegarde Firestore:", e);
+      Alert.alert(
+        t("error"),
+        `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
+      );
     }
   };
 
-  // Charger un résumé depuis le cache
   const handleLoadFromCache = (item: CachedSummary) => {
     setInputText(item.originalText);
     setSummary(item.summary);
@@ -300,7 +306,7 @@ export default function SummaryScreen() {
                 : currentLanguage === "en" ? "Saved Summaries"
                 : "Résumés sauvegardés"}
             </Text>
-            {cachedSummaries.slice(0, 5).map((item) => (
+            {cachedSummaries.map((item) => (
               <TouchableOpacity
                 key={item.id}
                 onPress={() => handleLoadFromCache(item)}
@@ -310,11 +316,11 @@ export default function SummaryScreen() {
                   elevation: 1,
                 }}
               >
-                <Text style={{
-                  fontSize: 13, color: "#374151", lineHeight: 18,
-                  numberOfLines: 2,
-                  textAlign: isRTL ? "right" : "left",
-                } as any}
+                <Text
+                  style={{
+                    fontSize: 13, color: "#374151", lineHeight: 18,
+                    textAlign: isRTL ? "right" : "left",
+                  } as any}
                   numberOfLines={2}
                 >
                   {item.summary}
