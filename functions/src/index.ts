@@ -1,30 +1,19 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/https";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+// functions/src/index.ts
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
+import OpenAI from "openai";
 
-//import {onRequest} from "firebase-functions/v2/https";
-//import * as logger from "firebase-functions/logger";
 import { summarize } from "./summarize";
 import { generateQuiz } from "./quiz";
 import { generatePlan } from "./plan";
 
 export { summarize, generateQuiz, generatePlan };
 
-// Start writing functions
-// https://firebase.google.com/docs/functions/typescript
+const openaiKey = defineSecret("OPENAI_API_KEY");
 
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
-// ── explainText ──────────────────────────────────────────
+// ── explainText ───────────────────────────────────────────
 export const explainText = onCall(
-  { region: "us-central1", secrets: ["OPENAI_API_KEY"] },
+  { region: "us-central1", secrets: [openaiKey] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
@@ -33,9 +22,7 @@ export const explainText = onCall(
     if (!text || text.trim().length === 0) {
       throw new HttpsError("invalid-argument", "Texte requis.");
     }
-
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
+    const openai = new OpenAI({ apiKey: openaiKey.value() });
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -53,16 +40,14 @@ export const explainText = onCall(
       ],
       temperature: 0.5,
     });
-
     const raw = completion.choices[0].message.content || "{}";
-    const clean = raw.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
+    return JSON.parse(raw.replace(/```json|```/g, "").trim());
   }
 );
 
 // ── solveExercise ─────────────────────────────────────────
 export const solveExercise = onCall(
-  { region: "us-central1", secrets: ["OPENAI_API_KEY"] },
+  { region: "us-central1", secrets: [openaiKey] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
@@ -71,9 +56,7 @@ export const solveExercise = onCall(
     if (!exercise || exercise.trim().length === 0) {
       throw new HttpsError("invalid-argument", "Exercice requis.");
     }
-
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
+    const openai = new OpenAI({ apiKey: openaiKey.value() });
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -91,16 +74,14 @@ export const solveExercise = onCall(
       ],
       temperature: 0.3,
     });
-
     const raw = completion.choices[0].message.content || "{}";
-    const clean = raw.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
+    return JSON.parse(raw.replace(/```json|```/g, "").trim());
   }
 );
 
 // ── generateFlashcards ────────────────────────────────────
 export const generateFlashcards = onCall(
-  { region: "us-central1", secrets: ["OPENAI_API_KEY"] },
+  { region: "us-central1", secrets: [openaiKey] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
@@ -109,10 +90,8 @@ export const generateFlashcards = onCall(
     if (!topic || topic.trim().length === 0) {
       throw new HttpsError("invalid-argument", "Sujet requis.");
     }
-
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({ apiKey: openaiKey.value() });
     const nbCards = Math.min(count || 8, 20);
-
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -130,9 +109,7 @@ export const generateFlashcards = onCall(
       ],
       temperature: 0.7,
     });
-
     const raw = completion.choices[0].message.content || "{}";
-    const clean = raw.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
+    return JSON.parse(raw.replace(/```json|```/g, "").trim());
   }
 );

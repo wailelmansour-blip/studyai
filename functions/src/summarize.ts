@@ -9,9 +9,9 @@ export const summarize = onCall(
   async (request) => {
 
     // 1. Vérifier que l'utilisateur est connecté
-    if (!request.auth) {
+    /*if (!request.auth) {
       throw new HttpsError("unauthenticated", "Connexion requise.");
-    }
+    }*/
 
     // 2. Valider l'input
     const text = request.data?.text;
