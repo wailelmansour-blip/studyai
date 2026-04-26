@@ -34,9 +34,7 @@ export default function RootLayout() {
       <Stack.Screen name="summary" />
       <Stack.Screen name="plan" />
       <Stack.Screen name="quiz" />
-      <Stack.Screen name="chat" />  {/* ← ajouter */}
+      <Stack.Screen name="chat" />
     </Stack>
   );
-
-
 }
