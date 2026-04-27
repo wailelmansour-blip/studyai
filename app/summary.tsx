@@ -48,23 +48,54 @@ export default function SummaryScreen() {
   const [isFromCache, setIsFromCache] = useState(false);
 
   useEffect(() => {
-    const loadCache = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
-        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
-        if (raw) {
-          const { data, timestamp } = JSON.parse(raw);
-          if (Date.now() - timestamp < CACHE_TTL) {
-            setCachedSummaries(data || []);
-          }
+  const loadCache = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      // 1. Essayer le cache local d'abord
+      const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+      if (raw) {
+        const { data, timestamp } = JSON.parse(raw);
+        // Cache valide et non vide → on s'arrête ici, pas de Firestore
+        if (Date.now() - timestamp < CACHE_TTL && data?.length > 0) {
+          setCachedSummaries(data);
+          return;
         }
-      } catch (e) {
-        console.log("Cache load error:", e);
       }
-    };
-    loadCache();
-  }, []);
+
+      // 2. Cache vide ou expiré → fallback Firestore
+      const { getDocs, query, collection, where, orderBy, limit } = await import("firebase/firestore");
+      const q = query(
+        collection(db, "summaries"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(5)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return;
+
+      const fromFirestore: CachedSummary[] = snap.docs.map((doc) => ({
+        id: doc.id,
+        userId: doc.data().userId,
+        originalText: doc.data().originalText,
+        summary: doc.data().summary,
+        language: doc.data().language || "fr",
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      }));
+
+      // Reconstruire le cache depuis Firestore (pas de doublon car on remplace tout)
+      setCachedSummaries(fromFirestore);
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+      );
+    } catch (e) {
+      console.log("Cache load error:", e);
+    }
+  };
+  loadCache();
+}, []);
 
   const handleSummarize = async () => {
     if (inputText.trim().length < 20) {

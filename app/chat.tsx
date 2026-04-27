@@ -322,10 +322,10 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
-      >
+  behavior={Platform.OS === "ios" ? "padding" : "padding"}
+  style={{ flex: 1 }}
+  keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 80}
+>
         {/* Header */}
         <View style={{
           backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 12,
