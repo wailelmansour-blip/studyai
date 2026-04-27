@@ -20,8 +20,7 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && isValidString(request.resource.data.name, 100)
         && isValidString(request.resource.data.email, 200);
-      allow update: if isOwner(userId)
-        && request.resource.data.id == userId;
+      allow update: if isOwner(userId);
       allow delete: if false;
 
       match /notes/{noteId} {
@@ -47,25 +46,23 @@ service cloud.firestore {
       }
     }
 
-    // ── usage/{userId_date} ──────────────────────────────────────────
-match /usage/{recordId} {
-  allow read: if isAuthenticated()
-    && (resource == null || resource.data.userId == request.auth.uid);
-  allow create: if isAuthenticated()
-    && request.resource.data.userId == request.auth.uid
-    && request.resource.data.count is number
-    && request.resource.data.count >= 0;
-  allow update: if isAuthenticated()
-    && resource.data.userId == request.auth.uid;
-  allow delete: if false;
-}
+    // ── usage/{userId_date} ──────────────────────────────────────
+    match /usage/{recordId} {
+      allow read: if isAuthenticated()
+        && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.count is number
+        && request.resource.data.count >= 0;
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
 
     // ── summaries ────────────────────────────────────────────────
     match /summaries/{summaryId} {
       allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId)
-        && isValidString(request.resource.data.originalText, 50000)
-        && isValidString(request.resource.data.summary, 50000);
+      allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
@@ -73,10 +70,7 @@ match /usage/{recordId} {
     // ── quizzes ──────────────────────────────────────────────────
     match /quizzes/{quizId} {
       allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId)
-        && request.resource.data.questions is list
-        && request.resource.data.questions.size() > 0
-        && request.resource.data.questions.size() <= 50;
+      allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
@@ -84,9 +78,7 @@ match /usage/{recordId} {
     // ── plans ────────────────────────────────────────────────────
     match /plans/{planId} {
       allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId)
-        && isValidString(request.resource.data.plan, 50000)
-        && request.resource.data.subjects is list;
+      allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
@@ -94,9 +86,7 @@ match /usage/{recordId} {
     // ── explanations ─────────────────────────────────────────────
     match /explanations/{explanationId} {
       allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId)
-        && isValidString(request.resource.data.text, 50000)
-        && isValidString(request.resource.data.explanation, 50000);
+      allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
@@ -104,9 +94,7 @@ match /usage/{recordId} {
     // ── solutions ────────────────────────────────────────────────
     match /solutions/{solutionId} {
       allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId)
-        && isValidString(request.resource.data.exercise, 50000)
-        && isValidString(request.resource.data.solution, 50000);
+      allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
@@ -114,19 +102,17 @@ match /usage/{recordId} {
     // ── flashcards ───────────────────────────────────────────────
     match /flashcards/{flashcardId} {
       allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId)
-        && request.resource.data.cards is list
-        && request.resource.data.cards.size() > 0;
+      allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
 
-    // ── chatSessions ─────────────────────────────────────────────────
-match /chatSessions/{sessionId} {
-  allow read: if isOwner(resource.data.userId);
-  allow create: if isOwner(request.resource.data.userId);
-  allow update: if isOwner(resource.data.userId);
-  allow delete: if isOwner(resource.data.userId);
-}
+    // ── chatSessions ─────────────────────────────────────────────
+    match /chatSessions/{sessionId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
   }
 }

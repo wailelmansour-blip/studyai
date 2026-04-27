@@ -124,6 +124,8 @@ export default function SolveScreen() {
         ? `Save failed.\n\n${e?.message || e?.code || "Unknown error"}`
         : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
     );
+  }
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
