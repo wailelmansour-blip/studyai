@@ -1,5 +1,5 @@
 // app/solve.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // ← useEffect ajouté
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -8,32 +8,174 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import {
+  getFirestore, collection, getDocs, query, where,
+  orderBy, limit, startAfter, QueryDocumentSnapshot,
+} from "firebase/firestore"; // ← AJOUT
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
 import { SolveResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
-import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
-import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
-import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
-import { limitInput, getTruncationMessage } from "../utils/inputLimiter"; // ← Phase 15
+import { useAIRequest } from "../hooks/useAIRequest";
+import { UsageBanner } from "../components/UsageBanner";
+import { readAICache, writeAICache } from "../store/aiCacheStore";
+import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
+
+const CACHE_KEY = "studyai_solutions"; // ← AJOUT
+const CACHE_TTL = 24 * 60 * 60 * 1000; // ← AJOUT
+const MAX_CACHE_ITEMS = 10;             // ← AJOUT
+const PAGE_SIZE = 5;                    // ← AJOUT
+
+interface CachedSolution {              // ← AJOUT
+  id: string;
+  userId: string;
+  exercise: string;
+  solution: string;
+  steps: string[];
+  subject: string;
+  createdAt: string;
+}
 
 export default function SolveScreen() {
   const app = getApp();
   const auth = getAuth(app);
+  const db = getFirestore(app); // ← AJOUT
   const functions = getFunctions(app, "us-central1");
   const { saveSolution, isLoading } = useAiStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
-  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
+  const { checkAndConsume } = useAIRequest();
 
   const [exercise, setExercise] = useState("");
   const [subject, setSubject] = useState("");
   const [result, setResult] = useState<SolveResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // ── Historique ────────────────────────────────────────────────── ← AJOUT
+  const [cachedSolutions, setCachedSolutions] = useState<CachedSolution[]>([]);
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    const loadCache = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data, timestamp } = JSON.parse(raw);
+          if (Date.now() - timestamp < CACHE_TTL && data?.length > 0) {
+            setCachedSolutions(data);
+            setHasMore(data.length >= PAGE_SIZE);
+            return;
+          }
+        }
+
+        const q = query(
+          collection(db, "solutions"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+
+        const fromFirestore: CachedSolution[] = snap.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          exercise: doc.data().exercise || "",
+          solution: doc.data().solution || "",
+          steps: doc.data().steps || [],
+          subject: doc.data().subject || "",
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedSolutions(fromFirestore);
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Solve cache load error:", e);
+      }
+    };
+    loadCache();
+  }, []);
+
+  const handleLoadMore = async () => {
+    if (!lastDoc || loadingMore) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, "solutions"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) { setHasMore(false); return; }
+
+      const more: CachedSolution[] = snap.docs.map((doc) => ({
+        id: doc.id,
+        userId: doc.data().userId,
+        exercise: doc.data().exercise || "",
+        solution: doc.data().solution || "",
+        steps: doc.data().steps || [],
+        subject: doc.data().subject || "",
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      }));
+
+      const updated = [...cachedSolutions, ...more];
+      setCachedSolutions(updated);
+      setLastDoc(snap.docs[snap.docs.length - 1]);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setDisplayCount((prev) => prev + PAGE_SIZE);
+
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updated.slice(0, MAX_CACHE_ITEMS), timestamp: Date.now() })
+      );
+    } catch (e) {
+      console.log("Load more solutions error:", e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const getMoreLabel = () => {
+    if (currentLanguage === "ar") return "عرض المزيد";
+    if (currentLanguage === "en") return "Show more";
+    return "Voir plus";
+  };
+
+  const handleLoadFromHistory = (item: CachedSolution) => {
+    setExercise(item.exercise);
+    setResult({
+      userId: item.userId,
+      exercise: item.exercise,
+      solution: item.solution,
+      steps: item.steps,
+      subject: item.subject,
+      createdAt: item.createdAt,
+    });
+    setSaved(true);
+  };
+  // ────────────────────────────────────────────────────────────────
 
   const SUBJECTS =
     currentLanguage === "ar"
@@ -43,88 +185,104 @@ export default function SolveScreen() {
       : ["Maths", "Physique", "Chimie", "Info", "Autre"];
 
   const handleSolve = async () => {
-  if (exercise.trim().length < 5) {
-    Alert.alert(t("error"), "Saisis l'exercice à résoudre.");
-    return;
-  }
+    if (exercise.trim().length < 5) {
+      Alert.alert(t("error"), "Saisis l'exercice à résoudre.");
+      return;
+    }
 
-  const allowed = await checkAndConsume();
-  if (!allowed) return;
+    const allowed = await checkAndConsume();
+    if (!allowed) return;
 
-  // Phase 15 — limiter input
-  const { text: limitedExercise, wasTruncated } = limitInput(exercise, "solve");
-  if (wasTruncated) {
-    Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 1500));
-  }
+    const { text: limitedExercise, wasTruncated } = limitInput(exercise, "solve");
+    if (wasTruncated) {
+      Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 1500));
+    }
 
-  // Phase 15 — vérifier cache
-  const cacheInput = { exercise: limitedExercise, subject, language: currentLanguage };
-  const cached = await readAICache("solve", cacheInput);
-  if (cached) {
-    setResult({
-      userId: auth.currentUser?.uid || "anonymous",
-      exercise,
-      solution: cached.solution || "",
-      steps: cached.steps || [],
-      subject: cached.subject || subject || "Général",
-      createdAt: new Date().toISOString(),
-    });
-    return;
-  }
+    const cacheInput = { exercise: limitedExercise, subject, language: currentLanguage };
+    const cached = await readAICache("solve", cacheInput);
+    if (cached) {
+      setResult({
+        userId: auth.currentUser?.uid || "anonymous",
+        exercise,
+        solution: cached.solution || "",
+        steps: cached.steps || [],
+        subject: cached.subject || subject || "Général",
+        createdAt: new Date().toISOString(),
+      });
+      return;
+    }
 
-  setGenerating(true);
-  setResult(null);
-  setSaved(false);
-  try {
-    const fn = httpsCallable(functions, "solveExercise");
-    const res = await fn({ exercise: limitedExercise, subject, language: currentLanguage });
-    const data = res.data as any;
-    setResult({
-      userId: auth.currentUser?.uid || "anonymous",
-      exercise,
-      solution: data.solution || "",
-      steps: data.steps || [],
-      subject: data.subject || subject || "Général",
-      createdAt: new Date().toISOString(),
-    });
-    // Phase 15 — sauvegarder cache
-    await writeAICache("solve", cacheInput, data);
-  } catch (e: any) {
-    Alert.alert(t("error"), e.message || "La résolution a échoué.");
-  } finally {
-    setGenerating(false);
-  }
-};
+    setGenerating(true);
+    setResult(null);
+    setSaved(false);
+    try {
+      const fn = httpsCallable(functions, "solveExercise");
+      const res = await fn({ exercise: limitedExercise, subject, language: currentLanguage });
+      const data = res.data as any;
+      setResult({
+        userId: auth.currentUser?.uid || "anonymous",
+        exercise,
+        solution: data.solution || "",
+        steps: data.steps || [],
+        subject: data.subject || subject || "Général",
+        createdAt: new Date().toISOString(),
+      });
+      await writeAICache("solve", cacheInput, data);
+    } catch (e: any) {
+      Alert.alert(t("error"), e.message || "La résolution a échoué.");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleSave = async () => {
-  if (!result) return;
+    if (!result) return;
 
-  const user = auth.currentUser;
-  if (!user) {
-    Alert.alert(
-      t("error"),
-      currentLanguage === "ar" ? "يجب تسجيل الدخول للحفظ"
-      : currentLanguage === "en" ? "You must be logged in to save"
-      : "Tu dois être connecté pour sauvegarder."
-    );
-    return;
-  }
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert(
+        t("error"),
+        currentLanguage === "ar" ? "يجب تسجيل الدخول للحفظ"
+        : currentLanguage === "en" ? "You must be logged in to save"
+        : "Tu dois être connecté pour sauvegarder."
+      );
+      return;
+    }
 
-  try {
-    await saveSolution(result);
-    setSaved(true);
-    Alert.alert("✅", t("saved"));
-  } catch (e: any) {
-    console.error("Erreur sauvegarde solution:", e);
-    Alert.alert(
-      t("error"),
-      currentLanguage === "ar"
-        ? `فشل الحفظ.\n\n${e?.message || e?.code || "خطأ غير معروف"}`
-        : currentLanguage === "en"
-        ? `Save failed.\n\n${e?.message || e?.code || "Unknown error"}`
-        : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
-    );
-  }
+    try {
+      await saveSolution(result);
+      setSaved(true);
+
+      // ── Mettre à jour l'historique local ── ← AJOUT
+      const newEntry: CachedSolution = {
+        id: Date.now().toString(),
+        userId: user.uid,
+        exercise: result.exercise,
+        solution: result.solution,
+        steps: result.steps,
+        subject: result.subject,
+        createdAt: result.createdAt,
+      };
+      const updated = [newEntry, ...cachedSolutions].slice(0, MAX_CACHE_ITEMS);
+      setCachedSolutions(updated);
+      setHasMore(updated.length >= PAGE_SIZE);
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updated, timestamp: Date.now() })
+      );
+
+      Alert.alert("✅", t("saved"));
+    } catch (e: any) {
+      console.error("Erreur sauvegarde solution:", e);
+      Alert.alert(
+        t("error"),
+        currentLanguage === "ar"
+          ? `فشل الحفظ.\n\n${e?.message || e?.code || "خطأ غير معروف"}`
+          : currentLanguage === "en"
+          ? `Save failed.\n\n${e?.message || e?.code || "Unknown error"}`
+          : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
+      );
+    }
   };
 
   return (
@@ -160,7 +318,6 @@ export default function SolveScreen() {
           </View>
         </View>
 
-        {/* ── Phase 14 : Bandeau usage ── */}
         <UsageBanner isRTL={isRTL} />
 
         {/* Matière */}
@@ -250,7 +407,6 @@ export default function SolveScreen() {
         {/* Résultat */}
         {result && (
           <View>
-            {/* Matière détectée */}
             <View style={{
               flexDirection: isRTL ? "row-reverse" : "row",
               alignItems: "center", marginBottom: 14,
@@ -265,7 +421,6 @@ export default function SolveScreen() {
               </View>
             </View>
 
-            {/* Étapes */}
             {result.steps.length > 0 && (
               <View style={{
                 backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
@@ -307,7 +462,6 @@ export default function SolveScreen() {
               </View>
             )}
 
-            {/* Solution finale */}
             <View style={{
               backgroundColor: "#F0FDF4", borderRadius: 14, padding: 16,
               marginBottom: 16,
@@ -331,7 +485,6 @@ export default function SolveScreen() {
               </Text>
             </View>
 
-            {/* Actions */}
             <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
               <TouchableOpacity
                 onPress={() => { setResult(null); setSaved(false); setExercise(""); }}
@@ -363,6 +516,87 @@ export default function SolveScreen() {
             </View>
           </View>
         )}
+
+        {/* ── Historique solutions ── ← AJOUT */}
+        {cachedSolutions.length > 0 && !result && (
+          <View style={{ marginTop: 24 }}>
+            <Text style={{
+              fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              🕒 {currentLanguage === "ar" ? "الحلول المحفوظة"
+                : currentLanguage === "en" ? "Saved Solutions"
+                : "Solutions sauvegardées"}
+            </Text>
+            {cachedSolutions.slice(0, displayCount).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => handleLoadFromHistory(item)}
+                style={{
+                  backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
+                  marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB",
+                  elevation: 1,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13, color: "#374151", lineHeight: 18,
+                    textAlign: isRTL ? "right" : "left",
+                  } as any}
+                  numberOfLines={2}
+                >
+                  ✏️ {item.exercise}
+                </Text>
+                <View style={{
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  justifyContent: "space-between", marginTop: 6,
+                }}>
+                  <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                    {new Date(item.createdAt).toLocaleDateString(
+                      currentLanguage === "ar" ? "ar-SA"
+                      : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                    )}
+                  </Text>
+                  {item.subject ? (
+                    <View style={{
+                      backgroundColor: "#EEF2FF", borderRadius: 4,
+                      paddingHorizontal: 6, paddingVertical: 1,
+                    }}>
+                      <Text style={{ fontSize: 10, color: "#6366F1", fontWeight: "600" }}>
+                        {item.subject}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {hasMore && (
+              <TouchableOpacity
+                onPress={handleLoadMore}
+                disabled={loadingMore}
+                style={{
+                  borderRadius: 12, padding: 14, alignItems: "center",
+                  backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+                  marginTop: 4,
+                }}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator size="small" color="#6366F1" />
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="chevron-down" size={16} color="#6366F1" />
+                    <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 14 }}>
+                      {getMoreLabel()}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {/* ── fin Historique ── */}
+
       </ScrollView>
     </SafeAreaView>
   );

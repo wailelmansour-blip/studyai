@@ -1,5 +1,5 @@
 // app/plan.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // ← useEffect ajouté
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert, Platform,
@@ -9,8 +9,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import {
+  getFirestore, collection, getDocs, query, where,
+  orderBy, limit, startAfter, QueryDocumentSnapshot,
+} from "firebase/firestore"; // ← AJOUT
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
 import { usePlanStore } from "../store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "../types/plan";
 import { useTranslation } from "react-i18next";
@@ -21,9 +26,27 @@ import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
 import { schedulePlanAlert } from "../services/notifications";
 
+const CACHE_KEY = "studyai_plans";       // ← AJOUT
+const CACHE_TTL = 24 * 60 * 60 * 1000;  // ← AJOUT
+const MAX_CACHE_ITEMS = 10;              // ← AJOUT
+const PAGE_SIZE = 5;                     // ← AJOUT
+
+interface CachedPlan {                   // ← AJOUT
+  id: string;
+  userId: string;
+  title: string;
+  subjects: string[];
+  examDate: string;
+  totalDays: number;
+  sessions: StudySession[];
+  tips: string[];
+  createdAt: string;
+}
+
 export default function PlanScreen() {
   const app = getApp();
   const auth = getAuth(app);
+  const db = getFirestore(app); // ← AJOUT
   const functions = getFunctions(app, "us-central1");
   const { savePlan, isLoading } = usePlanStore();
   const { t } = useTranslation();
@@ -40,6 +63,122 @@ export default function PlanScreen() {
   const [generatedPlan, setGeneratedPlan] = useState<StudyPlan | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // ── Historique ──────────────────────────────────────────────── ← AJOUT
+  const [cachedPlans, setCachedPlans] = useState<CachedPlan[]>([]);
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // ── Charger historique au démarrage ─────────────────────────── ← AJOUT
+  useEffect(() => {
+    const loadCache = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        // 1. Cache local valide → utiliser
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data, timestamp } = JSON.parse(raw);
+          if (Date.now() - timestamp < CACHE_TTL && data?.length > 0) {
+            setCachedPlans(data);
+            setHasMore(data.length >= PAGE_SIZE);
+            return;
+          }
+        }
+
+        // 2. Fallback Firestore
+        const q = query(
+          collection(db, "plans"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+
+        const fromFirestore: CachedPlan[] = snap.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          title: doc.data().title || "",
+          subjects: doc.data().subjects || [],
+          examDate: doc.data().examDate || "",
+          totalDays: doc.data().totalDays || 0,
+          sessions: doc.data().sessions || [],
+          tips: doc.data().tips || [],
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedPlans(fromFirestore);
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Plan cache load error:", e);
+      }
+    };
+    loadCache();
+  }, []);
+
+  // ── Charger plus ─────────────────────────────────────────────── ← AJOUT
+  const handleLoadMore = async () => {
+    if (!lastDoc || loadingMore) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, "plans"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) { setHasMore(false); return; }
+
+      const more: CachedPlan[] = snap.docs.map((doc) => ({
+        id: doc.id,
+        userId: doc.data().userId,
+        title: doc.data().title || "",
+        subjects: doc.data().subjects || [],
+        examDate: doc.data().examDate || "",
+        totalDays: doc.data().totalDays || 0,
+        sessions: doc.data().sessions || [],
+        tips: doc.data().tips || [],
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      }));
+
+      const updated = [...cachedPlans, ...more];
+      setCachedPlans(updated);
+      setLastDoc(snap.docs[snap.docs.length - 1]);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setDisplayCount((prev) => prev + PAGE_SIZE);
+
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updated.slice(0, MAX_CACHE_ITEMS), timestamp: Date.now() })
+      );
+    } catch (e) {
+      console.log("Load more plans error:", e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const getMoreLabel = () => {
+    if (currentLanguage === "ar") return "عرض المزيد";
+    if (currentLanguage === "en") return "Show more";
+    return "Voir plus";
+  };
+  // ────────────────────────────────────────────────────────────────
 
   const addSubject = () => {
     if (subjects.length < 8) setSubjects([...subjects, ""]);
@@ -178,7 +317,6 @@ export default function PlanScreen() {
     }
   };
 
-  // ── CORRECTION Phase 16 : handleSave avec traductions ──
   const handleSave = async () => {
     if (!generatedPlan) return;
 
@@ -196,6 +334,27 @@ export default function PlanScreen() {
     try {
       await savePlan(generatedPlan);
       setSaved(true);
+
+      // ── Mettre à jour l'historique local ── ← AJOUT
+      const newEntry: CachedPlan = {
+        id: Date.now().toString(),
+        userId: user.uid,
+        title: generatedPlan.title,
+        subjects: generatedPlan.subjects,
+        examDate: generatedPlan.examDate,
+        totalDays: generatedPlan.totalDays,
+        sessions: generatedPlan.sessions,
+        tips: generatedPlan.tips || [],
+        createdAt: generatedPlan.createdAt,
+      };
+      const updated = [newEntry, ...cachedPlans].slice(0, MAX_CACHE_ITEMS);
+      setCachedPlans(updated);
+      setHasMore(updated.length >= PAGE_SIZE);
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updated, timestamp: Date.now() })
+      );
+
       Alert.alert("✅", t("saved"));
     } catch (e: any) {
       console.error("Erreur sauvegarde plan:", e);
@@ -216,6 +375,21 @@ export default function PlanScreen() {
     setSubjects([""]);
     setExamDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
     setHoursPerDay("2");
+  };
+
+  // ── Charger un plan depuis l'historique ── ← AJOUT
+  const handleLoadFromHistory = (item: CachedPlan) => {
+    setGeneratedPlan({
+      userId: item.userId,
+      title: item.title,
+      subjects: item.subjects,
+      examDate: item.examDate,
+      totalDays: item.totalDays,
+      sessions: item.sessions,
+      tips: item.tips,
+      createdAt: item.createdAt,
+    });
+    setSaved(true);
   };
 
   return (
@@ -411,6 +585,80 @@ export default function PlanScreen() {
                 </View>
               )}
             </TouchableOpacity>
+
+            {/* ── Historique plans ── ← AJOUT */}
+            {cachedPlans.length > 0 && (
+              <View style={{ marginTop: 28 }}>
+                <Text style={{
+                  fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
+                  textAlign: isRTL ? "right" : "left",
+                }}>
+                  🕒 {currentLanguage === "ar" ? "خطط الدراسة المحفوظة"
+                    : currentLanguage === "en" ? "Saved Study Plans"
+                    : "Plans d'étude sauvegardés"}
+                </Text>
+                {cachedPlans.slice(0, displayCount).map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => handleLoadFromHistory(item)}
+                    style={{
+                      backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
+                      marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB",
+                      elevation: 1,
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 13, fontWeight: "600", color: "#374151",
+                      textAlign: isRTL ? "right" : "left",
+                    }}
+                      numberOfLines={1}
+                    >
+                      🎯 {item.title}
+                    </Text>
+                    <Text style={{
+                      fontSize: 12, color: "#6B7280", marginTop: 4,
+                      textAlign: isRTL ? "right" : "left",
+                    }}>
+                      {item.subjects.join(", ")}
+                    </Text>
+                    <Text style={{
+                      fontSize: 11, color: "#9CA3AF", marginTop: 4,
+                      textAlign: isRTL ? "right" : "left",
+                    }}>
+                      {new Date(item.createdAt).toLocaleDateString(
+                        currentLanguage === "ar" ? "ar-SA"
+                        : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                      )}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+
+                {/* Bouton Voir plus */}
+                {hasMore && (
+                  <TouchableOpacity
+                    onPress={handleLoadMore}
+                    disabled={loadingMore}
+                    style={{
+                      borderRadius: 12, padding: 14, alignItems: "center",
+                      backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+                      marginTop: 4,
+                    }}
+                  >
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color="#6366F1" />
+                    ) : (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Ionicons name="chevron-down" size={16} color="#6366F1" />
+                        <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 14 }}>
+                          {getMoreLabel()}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+            {/* ── fin Historique ── */}
           </View>
         )}
 

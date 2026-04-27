@@ -1,5 +1,5 @@
 // app/explain.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // ← useEffect ajouté
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -8,32 +8,174 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import {
+  getFirestore, collection, getDocs, query, where,
+  orderBy, limit, startAfter, QueryDocumentSnapshot,
+} from "firebase/firestore"; // ← AJOUT
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
 import { ExplainResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
-import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
-import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
-import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
-import { limitInput, getTruncationMessage } from "../utils/inputLimiter"; // ← Phase 15
+import { useAIRequest } from "../hooks/useAIRequest";
+import { UsageBanner } from "../components/UsageBanner";
+import { readAICache, writeAICache } from "../store/aiCacheStore";
+import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
+
+const CACHE_KEY = "studyai_explanations"; // ← AJOUT
+const CACHE_TTL = 24 * 60 * 60 * 1000;   // ← AJOUT
+const MAX_CACHE_ITEMS = 10;               // ← AJOUT
+const PAGE_SIZE = 5;                      // ← AJOUT
+
+interface CachedExplanation {             // ← AJOUT
+  id: string;
+  userId: string;
+  inputText: string;
+  explanation: string;
+  keyPoints: string[];
+  difficulty: string;
+  createdAt: string;
+}
 
 export default function ExplainScreen() {
   const app = getApp();
   const auth = getAuth(app);
+  const db = getFirestore(app); // ← AJOUT
   const functions = getFunctions(app, "us-central1");
   const { saveExplanation, isLoading } = useAiStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
-  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
+  const { checkAndConsume } = useAIRequest();
 
   const [text, setText] = useState("");
   const [difficulty, setDifficulty] = useState<"facile" | "moyen" | "difficile">("moyen");
   const [result, setResult] = useState<ExplainResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // ── Historique ────────────────────────────────────────────────── ← AJOUT
+  const [cachedExplanations, setCachedExplanations] = useState<CachedExplanation[]>([]);
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    const loadCache = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data, timestamp } = JSON.parse(raw);
+          if (Date.now() - timestamp < CACHE_TTL && data?.length > 0) {
+            setCachedExplanations(data);
+            setHasMore(data.length >= PAGE_SIZE);
+            return;
+          }
+        }
+
+        const q = query(
+          collection(db, "explanations"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+
+        const fromFirestore: CachedExplanation[] = snap.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          inputText: doc.data().inputText || doc.data().text || "",
+          explanation: doc.data().explanation || "",
+          keyPoints: doc.data().keyPoints || [],
+          difficulty: doc.data().difficulty || "moyen",
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedExplanations(fromFirestore);
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Explain cache load error:", e);
+      }
+    };
+    loadCache();
+  }, []);
+
+  const handleLoadMore = async () => {
+    if (!lastDoc || loadingMore) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, "explanations"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) { setHasMore(false); return; }
+
+      const more: CachedExplanation[] = snap.docs.map((doc) => ({
+        id: doc.id,
+        userId: doc.data().userId,
+        inputText: doc.data().inputText || doc.data().text || "",
+        explanation: doc.data().explanation || "",
+        keyPoints: doc.data().keyPoints || [],
+        difficulty: doc.data().difficulty || "moyen",
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      }));
+
+      const updated = [...cachedExplanations, ...more];
+      setCachedExplanations(updated);
+      setLastDoc(snap.docs[snap.docs.length - 1]);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setDisplayCount((prev) => prev + PAGE_SIZE);
+
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updated.slice(0, MAX_CACHE_ITEMS), timestamp: Date.now() })
+      );
+    } catch (e) {
+      console.log("Load more explanations error:", e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const getMoreLabel = () => {
+    if (currentLanguage === "ar") return "عرض المزيد";
+    if (currentLanguage === "en") return "Show more";
+    return "Voir plus";
+  };
+
+  const handleLoadFromHistory = (item: CachedExplanation) => {
+    setText(item.inputText);
+    setResult({
+      userId: item.userId,
+      inputText: item.inputText,
+      explanation: item.explanation,
+      keyPoints: item.keyPoints,
+      difficulty: item.difficulty as any,
+      createdAt: item.createdAt,
+    });
+    setSaved(true);
+  };
+  // ────────────────────────────────────────────────────────────────
 
   const difficultyColors: Record<string, string> = {
     facile: "#10B981",
@@ -48,89 +190,105 @@ export default function ExplainScreen() {
   };
 
   const handleExplain = async () => {
-  if (text.trim().length < 10) {
-    Alert.alert(t("error"), "Saisis au moins 10 caractères.");
-    return;
-  }
+    if (text.trim().length < 10) {
+      Alert.alert(t("error"), "Saisis au moins 10 caractères.");
+      return;
+    }
 
-  const allowed = await checkAndConsume();
-  if (!allowed) return;
+    const allowed = await checkAndConsume();
+    if (!allowed) return;
 
-  // Phase 15 — limiter input
-  const { text: limitedText, wasTruncated } = limitInput(text, "explain");
-  if (wasTruncated) {
-    Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 2000));
-  }
+    const { text: limitedText, wasTruncated } = limitInput(text, "explain");
+    if (wasTruncated) {
+      Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 2000));
+    }
 
-  // Phase 15 — vérifier cache
-  const cacheInput = { text: limitedText, difficulty, language: currentLanguage };
-  const cached = await readAICache("explain", cacheInput);
-  if (cached) {
-    setResult({
-      userId: auth.currentUser?.uid || "anonymous",
-      inputText: text,
-      explanation: cached.explanation || "",
-      keyPoints: cached.keyPoints || [],
-      difficulty: cached.difficulty || difficulty,
-      createdAt: new Date().toISOString(),
-    });
-    return;
-  }
+    const cacheInput = { text: limitedText, difficulty, language: currentLanguage };
+    const cached = await readAICache("explain", cacheInput);
+    if (cached) {
+      setResult({
+        userId: auth.currentUser?.uid || "anonymous",
+        inputText: text,
+        explanation: cached.explanation || "",
+        keyPoints: cached.keyPoints || [],
+        difficulty: cached.difficulty || difficulty,
+        createdAt: new Date().toISOString(),
+      });
+      return;
+    }
 
-  setGenerating(true);
-  setResult(null);
-  setSaved(false);
-  try {
-    const fn = httpsCallable(functions, "explainText");
-    const res = await fn({ text: limitedText, difficulty, language: currentLanguage });
-    const data = res.data as any;
-    setResult({
-      userId: auth.currentUser?.uid || "anonymous",
-      inputText: text,
-      explanation: data.explanation || "",
-      keyPoints: data.keyPoints || [],
-      difficulty: data.difficulty || difficulty,
-      createdAt: new Date().toISOString(),
-    });
-    // Phase 15 — sauvegarder cache
-    await writeAICache("explain", cacheInput, data);
-  } catch (e: any) {
-    Alert.alert(t("error"), e.message || "La génération a échoué.");
-  } finally {
-    setGenerating(false);
-  }
-};
+    setGenerating(true);
+    setResult(null);
+    setSaved(false);
+    try {
+      const fn = httpsCallable(functions, "explainText");
+      const res = await fn({ text: limitedText, difficulty, language: currentLanguage });
+      const data = res.data as any;
+      setResult({
+        userId: auth.currentUser?.uid || "anonymous",
+        inputText: text,
+        explanation: data.explanation || "",
+        keyPoints: data.keyPoints || [],
+        difficulty: data.difficulty || difficulty,
+        createdAt: new Date().toISOString(),
+      });
+      await writeAICache("explain", cacheInput, data);
+    } catch (e: any) {
+      Alert.alert(t("error"), e.message || "La génération a échoué.");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
-const handleSave = async () => {
-  if (!result) return;
+  const handleSave = async () => {
+    if (!result) return;
 
-  const user = auth.currentUser;
-  if (!user) {
-    Alert.alert(
-      t("error"),
-      currentLanguage === "ar" ? "يجب تسجيل الدخول للحفظ"
-      : currentLanguage === "en" ? "You must be logged in to save"
-      : "Tu dois être connecté pour sauvegarder."
-    );
-    return;
-  }
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert(
+        t("error"),
+        currentLanguage === "ar" ? "يجب تسجيل الدخول للحفظ"
+        : currentLanguage === "en" ? "You must be logged in to save"
+        : "Tu dois être connecté pour sauvegarder."
+      );
+      return;
+    }
 
-  try {
-    await saveExplanation(result);
-    setSaved(true);
-    Alert.alert("✅", t("saved"));
-  } catch (e: any) {
-    console.error("Erreur sauvegarde explanation:", e);
-    Alert.alert(
-      t("error"),
-      currentLanguage === "ar"
-        ? `فشل الحفظ.\n\n${e?.message || e?.code || "خطأ غير معروف"}`
-        : currentLanguage === "en"
-        ? `Save failed.\n\n${e?.message || e?.code || "Unknown error"}`
-        : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
-    );
-  }
-};
+    try {
+      await saveExplanation(result);
+      setSaved(true);
+
+      // ── Mettre à jour l'historique local ── ← AJOUT
+      const newEntry: CachedExplanation = {
+        id: Date.now().toString(),
+        userId: user.uid,
+        inputText: result.inputText,
+        explanation: result.explanation,
+        keyPoints: result.keyPoints,
+        difficulty: result.difficulty,
+        createdAt: result.createdAt,
+      };
+      const updated = [newEntry, ...cachedExplanations].slice(0, MAX_CACHE_ITEMS);
+      setCachedExplanations(updated);
+      setHasMore(updated.length >= PAGE_SIZE);
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updated, timestamp: Date.now() })
+      );
+
+      Alert.alert("✅", t("saved"));
+    } catch (e: any) {
+      console.error("Erreur sauvegarde explanation:", e);
+      Alert.alert(
+        t("error"),
+        currentLanguage === "ar"
+          ? `فشل الحفظ.\n\n${e?.message || e?.code || "خطأ غير معروف"}`
+          : currentLanguage === "en"
+          ? `Save failed.\n\n${e?.message || e?.code || "Unknown error"}`
+          : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
@@ -165,7 +323,6 @@ const handleSave = async () => {
           </View>
         </View>
 
-        {/* ── Phase 14 : Bandeau usage ── */}
         <UsageBanner isRTL={isRTL} />
 
         {/* Input */}
@@ -253,7 +410,6 @@ const handleSave = async () => {
         {/* Résultat */}
         {result && (
           <View>
-            {/* Explication */}
             <View style={{
               backgroundColor: "#EEF2FF", borderRadius: 14, padding: 16, marginBottom: 14,
               borderLeftWidth: isRTL ? 0 : 4,
@@ -276,7 +432,6 @@ const handleSave = async () => {
               </Text>
             </View>
 
-            {/* Points clés */}
             {result.keyPoints.length > 0 && (
               <View style={{
                 backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
@@ -316,7 +471,6 @@ const handleSave = async () => {
               </View>
             )}
 
-            {/* Badge difficulté */}
             <View style={{
               flexDirection: isRTL ? "row-reverse" : "row",
               alignItems: "center", marginBottom: 16,
@@ -334,7 +488,6 @@ const handleSave = async () => {
               </View>
             </View>
 
-            {/* Actions */}
             <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
               <TouchableOpacity
                 onPress={() => { setResult(null); setSaved(false); setText(""); }}
@@ -366,6 +519,85 @@ const handleSave = async () => {
             </View>
           </View>
         )}
+
+        {/* ── Historique explications ── ← AJOUT */}
+        {cachedExplanations.length > 0 && !result && (
+          <View style={{ marginTop: 24 }}>
+            <Text style={{
+              fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              🕒 {currentLanguage === "ar" ? "الشروحات المحفوظة"
+                : currentLanguage === "en" ? "Saved Explanations"
+                : "Explications sauvegardées"}
+            </Text>
+            {cachedExplanations.slice(0, displayCount).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => handleLoadFromHistory(item)}
+                style={{
+                  backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
+                  marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB",
+                  elevation: 1,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13, color: "#374151", lineHeight: 18,
+                    textAlign: isRTL ? "right" : "left",
+                  } as any}
+                  numberOfLines={2}
+                >
+                  {item.explanation}
+                </Text>
+                <View style={{
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  justifyContent: "space-between", marginTop: 6,
+                }}>
+                  <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                    {new Date(item.createdAt).toLocaleDateString(
+                      currentLanguage === "ar" ? "ar-SA"
+                      : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                    )}
+                  </Text>
+                  <View style={{
+                    backgroundColor: difficultyColors[item.difficulty] + "20",
+                    borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1,
+                  }}>
+                    <Text style={{ fontSize: 10, color: difficultyColors[item.difficulty], fontWeight: "600" }}>
+                      {difficultyLabels[item.difficulty as keyof typeof difficultyLabels]}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {hasMore && (
+              <TouchableOpacity
+                onPress={handleLoadMore}
+                disabled={loadingMore}
+                style={{
+                  borderRadius: 12, padding: 14, alignItems: "center",
+                  backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+                  marginTop: 4,
+                }}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator size="small" color="#6366F1" />
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="chevron-down" size={16} color="#6366F1" />
+                    <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 14 }}>
+                      {getMoreLabel()}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {/* ── fin Historique ── */}
+
       </ScrollView>
     </SafeAreaView>
   );

@@ -8,20 +8,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { collection, addDoc, Timestamp, getFirestore } from "firebase/firestore";
+import {
+  collection, addDoc, Timestamp, getFirestore,
+  getDocs, query, where, orderBy, limit, startAfter,
+  QueryDocumentSnapshot,
+} from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
-import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
-import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
-import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
-import { limitInput, getTruncationMessage } from "../utils/inputLimiter"; // ← Phase 15
+import { useAIRequest } from "../hooks/useAIRequest";
+import { UsageBanner } from "../components/UsageBanner";
+import { readAICache, writeAICache } from "../store/aiCacheStore";
+import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
 
 const CACHE_KEY = "studyai_summaries";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
-const MAX_CACHE_ITEMS = 5;
+const MAX_CACHE_ITEMS = 10; // ← augmenté de 5 à 10
+const PAGE_SIZE = 5;        // ← items affichés par page
 
 interface CachedSummary {
   id: string;
@@ -40,7 +45,7 @@ export default function SummaryScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
-  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
+  const { checkAndConsume } = useAIRequest();
 
   const [inputText, setInputText] = useState("");
   const [summary, setSummary] = useState("");
@@ -49,35 +54,86 @@ export default function SummaryScreen() {
   const [cachedSummaries, setCachedSummaries] = useState<CachedSummary[]>([]);
   const [isFromCache, setIsFromCache] = useState(false);
 
+  // ── Pagination ──
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // ── Charger le cache au démarrage ──
   useEffect(() => {
-  const loadCache = async () => {
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
+    const loadCache = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-      // 1. Essayer le cache local d'abord
-      const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
-      if (raw) {
-        const { data, timestamp } = JSON.parse(raw);
-        // Cache valide et non vide → on s'arrête ici, pas de Firestore
-        if (Date.now() - timestamp < CACHE_TTL && data?.length > 0) {
-          setCachedSummaries(data);
-          return;
+        // 1. Cache local valide → utiliser
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data, timestamp } = JSON.parse(raw);
+          if (Date.now() - timestamp < CACHE_TTL && data?.length > 0) {
+            setCachedSummaries(data);
+            setHasMore(data.length >= PAGE_SIZE);
+            return;
+          }
         }
-      }
 
-      // 2. Cache vide ou expiré → fallback Firestore
-      const { getDocs, query, collection, where, orderBy, limit } = await import("firebase/firestore");
+        // 2. Fallback Firestore
+        const q = query(
+          collection(db, "summaries"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+
+        const fromFirestore: CachedSummary[] = snap.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          originalText: doc.data().originalText,
+          summary: doc.data().summary,
+          language: doc.data().language || "fr",
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedSummaries(fromFirestore);
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Cache load error:", e);
+      }
+    };
+    loadCache();
+  }, []);
+
+  // ── Charger plus depuis Firestore ──
+  const handleLoadMore = async () => {
+    if (!lastDoc || loadingMore) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setLoadingMore(true);
+    try {
       const q = query(
         collection(db, "summaries"),
         where("userId", "==", user.uid),
         orderBy("createdAt", "desc"),
-        limit(5)
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
       );
       const snap = await getDocs(q);
-      if (snap.empty) return;
+      if (snap.empty) {
+        setHasMore(false);
+        return;
+      }
 
-      const fromFirestore: CachedSummary[] = snap.docs.map((doc) => ({
+      const more: CachedSummary[] = snap.docs.map((doc) => ({
         id: doc.id,
         userId: doc.data().userId,
         originalText: doc.data().originalText,
@@ -86,69 +142,75 @@ export default function SummaryScreen() {
         createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
       }));
 
-      // Reconstruire le cache depuis Firestore (pas de doublon car on remplace tout)
-      setCachedSummaries(fromFirestore);
+      const updated = [...cachedSummaries, ...more];
+      setCachedSummaries(updated);
+      setLastDoc(snap.docs[snap.docs.length - 1]);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setDisplayCount((prev) => prev + PAGE_SIZE);
+
+      // Mettre à jour le cache local
       await AsyncStorage.setItem(
         `${CACHE_KEY}_${user.uid}`,
-        JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        JSON.stringify({ data: updated.slice(0, MAX_CACHE_ITEMS), timestamp: Date.now() })
       );
     } catch (e) {
-      console.log("Cache load error:", e);
+      console.log("Load more error:", e);
+    } finally {
+      setLoadingMore(false);
     }
   };
-  loadCache();
-}, []);
 
   const handleSummarize = async () => {
-  if (inputText.trim().length < 20) {
-    Alert.alert(t("error"), "Saisis au moins 20 caractères à résumer.");
-    return;
-  }
+    if (inputText.trim().length < 20) {
+      Alert.alert(t("error"), "Saisis au moins 20 caractères à résumer.");
+      return;
+    }
 
-  // Phase 14 — limite IA
-  const allowed = await checkAndConsume();
-  if (!allowed) return;
+    const allowed = await checkAndConsume();
+    if (!allowed) return;
 
-  // Phase 15 — limiter la taille de l'input
-  const { text: limitedText, wasTruncated } = limitInput(inputText, "summary");
-  if (wasTruncated) {
-    Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 3000));
-  }
+    const { text: limitedText, wasTruncated } = limitInput(inputText, "summary");
+    if (wasTruncated) {
+      Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 3000));
+    }
 
-  // Phase 15 — vérifier le cache avant d'appeler l'IA
-  const cacheInput = { text: limitedText, language: currentLanguage };
-  const cached = await readAICache("summary", cacheInput);
-  if (cached) {
-    setSummary(cached.summary || "");
-    setIsFromCache(true);
-    setIsLoading(false);
-    return;
-  }
+    const cacheInput = { text: limitedText, language: currentLanguage };
+    const cached = await readAICache("summary", cacheInput);
+    if (cached) {
+      setSummary(cached.summary || "");
+      setIsFromCache(true);
+      setIsLoading(false);
+      return;
+    }
 
-  setIsLoading(true);
-  setSummary("");
-  setIsSaved(false);
-  setIsFromCache(false);
-  try {
-    const fn = httpsCallable(functions, "summarize");
-    const res = await fn({ text: limitedText, language: currentLanguage });
-    const data = res.data as any;
-    setSummary(data.summary || "");
-    // Phase 15 — sauvegarder dans le cache
-    await writeAICache("summary", cacheInput, data);
-  } catch (e: any) {
-    Alert.alert(t("error"), e.message || "La génération a échoué.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+    setIsLoading(true);
+    setSummary("");
+    setIsSaved(false);
+    setIsFromCache(false);
+    try {
+      const fn = httpsCallable(functions, "summarize");
+      const res = await fn({ text: limitedText, language: currentLanguage });
+      const data = res.data as any;
+      setSummary(data.summary || "");
+      await writeAICache("summary", cacheInput, data);
+    } catch (e: any) {
+      Alert.alert(t("error"), e.message || "La génération a échoué.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!summary) return;
 
     const user = auth.currentUser;
     if (!user) {
-      Alert.alert(t("error"), "Tu dois être connecté pour sauvegarder.");
+      Alert.alert(
+        t("error"),
+        currentLanguage === "ar" ? "يجب تسجيل الدخول للحفظ"
+        : currentLanguage === "en" ? "You must be logged in to save"
+        : "Tu dois être connecté pour sauvegarder."
+      );
       return;
     }
 
@@ -169,6 +231,8 @@ export default function SummaryScreen() {
 
       const updated = [newEntry, ...cachedSummaries].slice(0, MAX_CACHE_ITEMS);
       setCachedSummaries(updated);
+      setHasMore(updated.length >= PAGE_SIZE);
+
       await AsyncStorage.setItem(
         `${CACHE_KEY}_${user.uid}`,
         JSON.stringify({ data: updated, timestamp: Date.now() })
@@ -180,7 +244,11 @@ export default function SummaryScreen() {
       console.error("Erreur sauvegarde Firestore:", e);
       Alert.alert(
         t("error"),
-        `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
+        currentLanguage === "ar"
+          ? `فشل الحفظ.\n\n${e?.message || e?.code || "خطأ غير معروف"}`
+          : currentLanguage === "en"
+          ? `Save failed.\n\n${e?.message || e?.code || "Unknown error"}`
+          : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
       );
     }
   };
@@ -190,6 +258,12 @@ export default function SummaryScreen() {
     setSummary(item.summary);
     setIsSaved(true);
     setIsFromCache(true);
+  };
+
+  const getMoreLabel = () => {
+    if (currentLanguage === "ar") return "عرض المزيد";
+    if (currentLanguage === "en") return "Show more";
+    return "Voir plus";
   };
 
   return (
@@ -228,7 +302,6 @@ export default function SummaryScreen() {
           </View>
         </View>
 
-        {/* ── Phase 14 : Bandeau usage ── */}
         <UsageBanner isRTL={isRTL} />
 
         {/* Cache badge */}
@@ -357,7 +430,7 @@ export default function SummaryScreen() {
           </View>
         )}
 
-        {/* Historique cache */}
+        {/* Historique */}
         {cachedSummaries.length > 0 && summary === "" && (
           <View style={{ marginTop: 8 }}>
             <Text style={{
@@ -368,7 +441,8 @@ export default function SummaryScreen() {
                 : currentLanguage === "en" ? "Saved Summaries"
                 : "Résumés sauvegardés"}
             </Text>
-            {cachedSummaries.map((item) => (
+
+            {cachedSummaries.slice(0, displayCount).map((item) => (
               <TouchableOpacity
                 key={item.id}
                 onPress={() => handleLoadFromCache(item)}
@@ -398,6 +472,30 @@ export default function SummaryScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
+
+            {/* Bouton Voir plus */}
+            {hasMore && (
+              <TouchableOpacity
+                onPress={handleLoadMore}
+                disabled={loadingMore}
+                style={{
+                  borderRadius: 12, padding: 14, alignItems: "center",
+                  backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+                  marginTop: 4,
+                }}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator size="small" color="#6366F1" />
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="chevron-down" size={16} color="#6366F1" />
+                    <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 14 }}>
+                      {getMoreLabel()}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </ScrollView>
