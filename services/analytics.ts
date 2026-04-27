@@ -34,8 +34,8 @@ interface AICallEvent {
 interface ConversionEvent {
   userId: string;
   type: ConversionType;
-  screen?: string;
-  plan: string;         // "free" | "premium"
+  screen?: string;  // ← optionnel, jamais undefined dans Firestore
+  plan: string;
   date: string;
   createdAt: Timestamp;
 }
@@ -133,10 +133,11 @@ export const trackConversion = async (
     const event: ConversionEvent = {
       userId: user.uid,
       type,
-      screen,
       plan: usagePlan,
       date: getToday(),
       createdAt: Timestamp.now(),
+      // ← CORRECTION : n'ajouter screen que s'il est défini
+      ...(screen !== undefined && { screen }),
     };
 
     await addDoc(collection(db, "analytics_conversions"), event);
