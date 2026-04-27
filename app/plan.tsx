@@ -19,6 +19,7 @@ import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
 import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
 import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
 import { limitInput } from "../utils/inputLimiter";                // ← Phase 15
+import { schedulePlanAlert } from "../services/notifications"; // ← Phase 16
 
 export default function PlanScreen() {
   const app = getApp();
@@ -166,6 +167,13 @@ export default function PlanScreen() {
       tips: data.tips || [],
     };
     setGeneratedPlan(plan);
+
+    // Phase 16 — planifier l'alerte J-1 avant l'examen
+await schedulePlanAlert(
+  examDate.toISOString(),
+  limitedSubjects,
+  currentLanguage
+).catch(() => {}); // silencieux si permission refusée
 
     // Phase 15 — sauvegarder cache
     await writeAICache("plan", cacheInput, data);
