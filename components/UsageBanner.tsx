@@ -1,11 +1,12 @@
 // components/UsageBanner.tsx
-import React from "react";
+import React, { useEffect } from "react"; // ← useEffect ajouté
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useUsageStore } from "../store/usageStore";
 import { LIMITS } from "../types/usage";
 import { useLanguageStore } from "../store/languageStore";
 import { router } from "expo-router";
+import { trackConversion } from "../services/analytics"; // ← AJOUT Phase 17
 
 interface Props {
   isRTL?: boolean;
@@ -23,6 +24,13 @@ export const UsageBanner: React.FC<Props> = ({ isRTL = false }) => {
   const isPremium = usage.plan === "premium";
   const isAlmostDone = remaining <= 1 && !isPremium;
   const isDone = remaining === 0;
+
+  // ── Phase 17 : tracker quand la limite est atteinte ──
+  useEffect(() => {
+    if (isDone) {
+      trackConversion("limit_reached").catch(() => {}); // ← AJOUT Phase 17
+    }
+  }, [isDone]);
 
   const getLabel = () => {
     if (currentLanguage === "ar") {
@@ -106,7 +114,10 @@ export const UsageBanner: React.FC<Props> = ({ isRTL = false }) => {
         {/* Bouton upgrade si free et presque à la limite */}
         {!isPremium && isAlmostDone && (
           <TouchableOpacity
-            onPress={() => router.push("/profile")}
+            onPress={() => {
+              trackConversion("upgrade_view").catch(() => {}); // ← AJOUT Phase 17
+              router.push("/profile");
+            }}
             style={{
               backgroundColor: "#6366F1", borderRadius: 6,
               paddingHorizontal: 8, paddingVertical: 3,

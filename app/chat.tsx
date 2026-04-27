@@ -15,9 +15,10 @@ import { useChatStore } from "../store/chatStore";
 import { ChatMessage } from "../types/chat";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
-import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
-import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
-import { limitInput } from "../utils/inputLimiter"; // ← Phase 15
+import { useAIRequest } from "../hooks/useAIRequest";
+import { UsageBanner } from "../components/UsageBanner";
+import { limitInput } from "../utils/inputLimiter";
+import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 
 const COURSES_FR = [
   "Mathématiques", "Physique", "Chimie",
@@ -73,7 +74,8 @@ export default function ChatScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
-  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
+  const { checkAndConsume } = useAIRequest();
+  const { startTracking, endTracking, trackView } = useAnalytics("chat"); // ← AJOUT Phase 17
 
   const COURSES =
     currentLanguage === "ar" ? COURSES_AR
@@ -86,6 +88,10 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    trackView(); // ← AJOUT Phase 17
+  }, []);
 
   useEffect(() => {
     setTimeout(() => {
@@ -142,26 +148,24 @@ export default function ChatScreen() {
   const handleSend = async () => {
     if (!message.trim() || !selectedCourse || isTyping) return;
 
-    // ── Phase 14 : vérifier la limite avant l'appel IA ──
-    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
-    if (!allowed) return;                    // ← AJOUT Phase 14
+    const allowed = await checkAndConsume();
+    if (!allowed) return;
 
-    // Phase 15 — limiter la taille du message
-  const { text: limitedMessage } = limitInput(message.trim(), "chat");
+    const { text: limitedMessage } = limitInput(message.trim(), "chat");
 
-  const userMessage: ChatMessage = {
-    id: Date.now().toString(),
-    role: "user",
-    content: limitedMessage, // ← était message.trim()
-    timestamp: new Date().toISOString(),
-  };
-
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: limitedMessage,
+      timestamp: new Date().toISOString(),
+    };
 
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setMessage("");
     setIsTyping(true);
 
+    startTracking(); // ← AJOUT Phase 17
     try {
       const fn = httpsCallable(functions, "chatAI");
       const res = await fn({
@@ -197,12 +201,14 @@ export default function ChatScreen() {
 
       const finalMessages = [...newMessages, assistantMessage];
       setMessages(finalMessages);
+      endTracking(true); // ← AJOUT Phase 17 — succès
 
       if (sessionId) {
         await addMessage(sessionId, userMessage);
         await addMessage(sessionId, assistantMessage);
       }
     } catch (e: any) {
+      endTracking(false); // ← AJOUT Phase 17 — échec
       setMessages([...newMessages, {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -259,7 +265,6 @@ export default function ChatScreen() {
             </View>
           </View>
 
-          {/* ── Phase 14 : Bandeau usage ── */}
           <UsageBanner isRTL={isRTL} />
 
           {/* Info */}
@@ -327,10 +332,10 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
       <KeyboardAvoidingView
-  behavior={Platform.OS === "ios" ? "padding" : "padding"}
-  style={{ flex: 1 }}
-  keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 80}
->
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 80}
+      >
         {/* Header */}
         <View style={{
           backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 12,

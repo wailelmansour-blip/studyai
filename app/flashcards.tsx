@@ -1,5 +1,5 @@
 // app/flashcards.tsx
-import React, { useState, useEffect } from "react"; // ← useEffect ajouté
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -11,10 +11,10 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import {
   getFirestore, collection, getDocs, query, where,
   orderBy, limit, startAfter, QueryDocumentSnapshot,
-} from "firebase/firestore"; // ← AJOUT
+} from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FlashcardsResult, Flashcard } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
@@ -23,13 +23,14 @@ import { useAIRequest } from "../hooks/useAIRequest";
 import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
+import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 
-const CACHE_KEY = "studyai_flashcards"; // ← AJOUT
-const CACHE_TTL = 24 * 60 * 60 * 1000; // ← AJOUT
-const MAX_CACHE_ITEMS = 10;             // ← AJOUT
-const PAGE_SIZE = 5;                    // ← AJOUT
+const CACHE_KEY = "studyai_flashcards";
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+const MAX_CACHE_ITEMS = 10;
+const PAGE_SIZE = 5;
 
-interface CachedFlashcard {             // ← AJOUT
+interface CachedFlashcard {
   id: string;
   userId: string;
   topic: string;
@@ -40,13 +41,14 @@ interface CachedFlashcard {             // ← AJOUT
 export default function FlashcardsScreen() {
   const app = getApp();
   const auth = getAuth(app);
-  const db = getFirestore(app); // ← AJOUT
+  const db = getFirestore(app);
   const functions = getFunctions(app, "us-central1");
   const { saveFlashcards, isLoading } = useAiStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { startTracking, endTracking, trackConv, trackView } = useAnalytics("flashcards"); // ← AJOUT Phase 17
 
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("8");
@@ -56,7 +58,6 @@ export default function FlashcardsScreen() {
   const [flipped, setFlipped] = useState<Record<number, boolean>>({});
   const [currentCard, setCurrentCard] = useState(0);
 
-  // ── Historique ────────────────────────────────────────────────── ← AJOUT
   const [cachedFlashcards, setCachedFlashcards] = useState<CachedFlashcard[]>([]);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
@@ -64,6 +65,8 @@ export default function FlashcardsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
+    trackView(); // ← AJOUT Phase 17
+
     const loadCache = async () => {
       try {
         const user = auth.currentUser;
@@ -170,7 +173,6 @@ export default function FlashcardsScreen() {
     setCurrentCard(0);
     setSaved(true);
   };
-  // ────────────────────────────────────────────────────────────────
 
   const handleGenerate = async () => {
     if (topic.trim().length < 3) {
@@ -186,6 +188,7 @@ export default function FlashcardsScreen() {
     const cacheInput = { topic: limitedTopic, count, language: currentLanguage };
     const cached = await readAICache("flashcards", cacheInput);
     if (cached?.flashcards?.length > 0) {
+      endTracking(true, true); // ← AJOUT Phase 17 — cache hit
       setResult({
         userId: auth.currentUser?.uid || "anonymous",
         topic,
@@ -197,6 +200,7 @@ export default function FlashcardsScreen() {
       return;
     }
 
+    startTracking(); // ← AJOUT Phase 17
     setGenerating(true);
     setResult(null);
     setSaved(false);
@@ -213,7 +217,9 @@ export default function FlashcardsScreen() {
         createdAt: new Date().toISOString(),
       });
       await writeAICache("flashcards", cacheInput, data);
+      endTracking(true); // ← AJOUT Phase 17 — succès
     } catch (e: any) {
+      endTracking(false); // ← AJOUT Phase 17 — échec
       Alert.alert(t("error"), e.message || "La génération a échoué.");
     } finally {
       setGenerating(false);
@@ -237,8 +243,8 @@ export default function FlashcardsScreen() {
     try {
       await saveFlashcards(result);
       setSaved(true);
+      trackConv("first_save"); // ← AJOUT Phase 17
 
-      // ── Mettre à jour l'historique local ── ← AJOUT
       const newEntry: CachedFlashcard = {
         id: Date.now().toString(),
         userId: user.uid,
@@ -387,7 +393,7 @@ export default function FlashcardsScreen() {
               )}
             </TouchableOpacity>
 
-            {/* ── Historique flashcards ── ← AJOUT */}
+            {/* Historique flashcards */}
             {cachedFlashcards.length > 0 && (
               <View style={{ marginTop: 28 }}>
                 <Text style={{
@@ -466,7 +472,6 @@ export default function FlashcardsScreen() {
                 )}
               </View>
             )}
-            {/* ── fin Historique ── */}
           </View>
         )}
 

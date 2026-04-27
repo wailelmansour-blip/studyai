@@ -1,5 +1,5 @@
 // app/explain.tsx
-import React, { useState, useEffect } from "react"; // ← useEffect ajouté
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -11,10 +11,10 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import {
   getFirestore, collection, getDocs, query, where,
   orderBy, limit, startAfter, QueryDocumentSnapshot,
-} from "firebase/firestore"; // ← AJOUT
+} from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ExplainResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
@@ -23,13 +23,14 @@ import { useAIRequest } from "../hooks/useAIRequest";
 import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
+import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 
-const CACHE_KEY = "studyai_explanations"; // ← AJOUT
-const CACHE_TTL = 24 * 60 * 60 * 1000;   // ← AJOUT
-const MAX_CACHE_ITEMS = 10;               // ← AJOUT
-const PAGE_SIZE = 5;                      // ← AJOUT
+const CACHE_KEY = "studyai_explanations";
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+const MAX_CACHE_ITEMS = 10;
+const PAGE_SIZE = 5;
 
-interface CachedExplanation {             // ← AJOUT
+interface CachedExplanation {
   id: string;
   userId: string;
   inputText: string;
@@ -42,13 +43,14 @@ interface CachedExplanation {             // ← AJOUT
 export default function ExplainScreen() {
   const app = getApp();
   const auth = getAuth(app);
-  const db = getFirestore(app); // ← AJOUT
+  const db = getFirestore(app);
   const functions = getFunctions(app, "us-central1");
   const { saveExplanation, isLoading } = useAiStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { startTracking, endTracking, trackConv, trackView } = useAnalytics("explain"); // ← AJOUT Phase 17
 
   const [text, setText] = useState("");
   const [difficulty, setDifficulty] = useState<"facile" | "moyen" | "difficile">("moyen");
@@ -56,7 +58,6 @@ export default function ExplainScreen() {
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // ── Historique ────────────────────────────────────────────────── ← AJOUT
   const [cachedExplanations, setCachedExplanations] = useState<CachedExplanation[]>([]);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
@@ -64,6 +65,8 @@ export default function ExplainScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
+    trackView(); // ← AJOUT Phase 17
+
     const loadCache = async () => {
       try {
         const user = auth.currentUser;
@@ -175,7 +178,6 @@ export default function ExplainScreen() {
     });
     setSaved(true);
   };
-  // ────────────────────────────────────────────────────────────────
 
   const difficultyColors: Record<string, string> = {
     facile: "#10B981",
@@ -206,6 +208,7 @@ export default function ExplainScreen() {
     const cacheInput = { text: limitedText, difficulty, language: currentLanguage };
     const cached = await readAICache("explain", cacheInput);
     if (cached) {
+      endTracking(true, true); // ← AJOUT Phase 17 — cache hit
       setResult({
         userId: auth.currentUser?.uid || "anonymous",
         inputText: text,
@@ -217,6 +220,7 @@ export default function ExplainScreen() {
       return;
     }
 
+    startTracking(); // ← AJOUT Phase 17
     setGenerating(true);
     setResult(null);
     setSaved(false);
@@ -233,7 +237,9 @@ export default function ExplainScreen() {
         createdAt: new Date().toISOString(),
       });
       await writeAICache("explain", cacheInput, data);
+      endTracking(true); // ← AJOUT Phase 17 — succès
     } catch (e: any) {
+      endTracking(false); // ← AJOUT Phase 17 — échec
       Alert.alert(t("error"), e.message || "La génération a échoué.");
     } finally {
       setGenerating(false);
@@ -257,8 +263,8 @@ export default function ExplainScreen() {
     try {
       await saveExplanation(result);
       setSaved(true);
+      trackConv("first_save"); // ← AJOUT Phase 17
 
-      // ── Mettre à jour l'historique local ── ← AJOUT
       const newEntry: CachedExplanation = {
         id: Date.now().toString(),
         userId: user.uid,
@@ -520,7 +526,7 @@ export default function ExplainScreen() {
           </View>
         )}
 
-        {/* ── Historique explications ── ← AJOUT */}
+        {/* Historique explications */}
         {cachedExplanations.length > 0 && !result && (
           <View style={{ marginTop: 24 }}>
             <Text style={{
@@ -596,7 +602,6 @@ export default function ExplainScreen() {
             )}
           </View>
         )}
-        {/* ── fin Historique ── */}
 
       </ScrollView>
     </SafeAreaView>

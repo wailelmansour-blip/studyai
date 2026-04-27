@@ -1,5 +1,5 @@
 // app/plan.tsx
-import React, { useState, useEffect } from "react"; // ← useEffect ajouté
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert, Platform,
@@ -12,10 +12,10 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import {
   getFirestore, collection, getDocs, query, where,
   orderBy, limit, startAfter, QueryDocumentSnapshot,
-} from "firebase/firestore"; // ← AJOUT
+} from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { usePlanStore } from "../store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "../types/plan";
 import { useTranslation } from "react-i18next";
@@ -25,13 +25,14 @@ import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
 import { schedulePlanAlert } from "../services/notifications";
+import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 
-const CACHE_KEY = "studyai_plans";       // ← AJOUT
-const CACHE_TTL = 24 * 60 * 60 * 1000;  // ← AJOUT
-const MAX_CACHE_ITEMS = 10;              // ← AJOUT
-const PAGE_SIZE = 5;                     // ← AJOUT
+const CACHE_KEY = "studyai_plans";
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+const MAX_CACHE_ITEMS = 10;
+const PAGE_SIZE = 5;
 
-interface CachedPlan {                   // ← AJOUT
+interface CachedPlan {
   id: string;
   userId: string;
   title: string;
@@ -46,13 +47,14 @@ interface CachedPlan {                   // ← AJOUT
 export default function PlanScreen() {
   const app = getApp();
   const auth = getAuth(app);
-  const db = getFirestore(app); // ← AJOUT
+  const db = getFirestore(app);
   const functions = getFunctions(app, "us-central1");
   const { savePlan, isLoading } = usePlanStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { startTracking, endTracking, trackConv, trackView } = useAnalytics("plan"); // ← AJOUT Phase 17
 
   const [subjects, setSubjects] = useState<string[]>([""]);
   const [examDate, setExamDate] = useState<Date>(
@@ -64,21 +66,20 @@ export default function PlanScreen() {
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // ── Historique ──────────────────────────────────────────────── ← AJOUT
   const [cachedPlans, setCachedPlans] = useState<CachedPlan[]>([]);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // ── Charger historique au démarrage ─────────────────────────── ← AJOUT
   useEffect(() => {
+    trackView(); // ← AJOUT Phase 17
+
     const loadCache = async () => {
       try {
         const user = auth.currentUser;
         if (!user) return;
 
-        // 1. Cache local valide → utiliser
         const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
         if (raw) {
           const { data, timestamp } = JSON.parse(raw);
@@ -89,7 +90,6 @@ export default function PlanScreen() {
           }
         }
 
-        // 2. Fallback Firestore
         const q = query(
           collection(db, "plans"),
           where("userId", "==", user.uid),
@@ -126,7 +126,6 @@ export default function PlanScreen() {
     loadCache();
   }, []);
 
-  // ── Charger plus ─────────────────────────────────────────────── ← AJOUT
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;
     const user = auth.currentUser;
@@ -178,7 +177,6 @@ export default function PlanScreen() {
     if (currentLanguage === "en") return "Show more";
     return "Voir plus";
   };
-  // ────────────────────────────────────────────────────────────────
 
   const addSubject = () => {
     if (subjects.length < 8) setSubjects([...subjects, ""]);
@@ -236,6 +234,7 @@ export default function PlanScreen() {
     };
     const cached = await readAICache("plan", cacheInput);
     if (cached) {
+      endTracking(true, true); // ← AJOUT Phase 17 — cache hit
       const sessions: StudySession[] = [];
       const schedule = cached.schedule || {};
       Object.entries(schedule).forEach(([day, items]: [string, any]) => {
@@ -263,6 +262,7 @@ export default function PlanScreen() {
       return;
     }
 
+    startTracking(); // ← AJOUT Phase 17
     setGenerating(true);
     setGeneratedPlan(null);
     setSaved(false);
@@ -310,7 +310,9 @@ export default function PlanScreen() {
       ).catch(() => {});
 
       await writeAICache("plan", cacheInput, data);
+      endTracking(true); // ← AJOUT Phase 17 — succès
     } catch (error: any) {
+      endTracking(false); // ← AJOUT Phase 17 — échec
       Alert.alert(t("error"), error.message || "La génération a échoué.");
     } finally {
       setGenerating(false);
@@ -334,8 +336,8 @@ export default function PlanScreen() {
     try {
       await savePlan(generatedPlan);
       setSaved(true);
+      trackConv("first_save"); // ← AJOUT Phase 17
 
-      // ── Mettre à jour l'historique local ── ← AJOUT
       const newEntry: CachedPlan = {
         id: Date.now().toString(),
         userId: user.uid,
@@ -377,7 +379,6 @@ export default function PlanScreen() {
     setHoursPerDay("2");
   };
 
-  // ── Charger un plan depuis l'historique ── ← AJOUT
   const handleLoadFromHistory = (item: CachedPlan) => {
     setGeneratedPlan({
       userId: item.userId,
@@ -586,7 +587,7 @@ export default function PlanScreen() {
               )}
             </TouchableOpacity>
 
-            {/* ── Historique plans ── ← AJOUT */}
+            {/* Historique plans */}
             {cachedPlans.length > 0 && (
               <View style={{ marginTop: 28 }}>
                 <Text style={{
@@ -633,7 +634,6 @@ export default function PlanScreen() {
                   </TouchableOpacity>
                 ))}
 
-                {/* Bouton Voir plus */}
                 {hasMore && (
                   <TouchableOpacity
                     onPress={handleLoadMore}
@@ -658,14 +658,12 @@ export default function PlanScreen() {
                 )}
               </View>
             )}
-            {/* ── fin Historique ── */}
           </View>
         )}
 
         {/* Résultat */}
         {generatedPlan && (
           <View>
-            {/* Résumé */}
             <View style={{
               backgroundColor: "#EEF2FF", borderRadius: 14, padding: 16, marginBottom: 20,
             }}>
@@ -685,7 +683,6 @@ export default function PlanScreen() {
               </Text>
             </View>
 
-            {/* Sessions */}
             {generatedPlan.sessions.map((session: StudySession, index: number) => (
               <View key={index} style={{
                 backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
@@ -743,7 +740,6 @@ export default function PlanScreen() {
               </View>
             ))}
 
-            {/* Tips IA */}
             {generatedPlan.tips && generatedPlan.tips.length > 0 && (
               <View style={{
                 backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14,
@@ -781,7 +777,6 @@ export default function PlanScreen() {
               </View>
             )}
 
-            {/* Actions */}
             <View style={{
               flexDirection: isRTL ? "row-reverse" : "row",
               gap: 12, marginTop: 8,

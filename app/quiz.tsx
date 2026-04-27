@@ -1,5 +1,5 @@
 // app/quiz.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // ← useEffect ajouté
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -12,10 +12,11 @@ import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
-import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
-import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
-import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
-import { limitInput } from "../utils/inputLimiter";                // ← Phase 15
+import { useAIRequest } from "../hooks/useAIRequest";
+import { UsageBanner } from "../components/UsageBanner";
+import { readAICache, writeAICache } from "../store/aiCacheStore";
+import { limitInput } from "../utils/inputLimiter";
+import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 
 interface QuizQuestion {
   question: string;
@@ -31,7 +32,8 @@ export default function QuizScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
-  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
+  const { checkAndConsume } = useAIRequest();
+  const { startTracking, endTracking, trackView } = useAnalytics("quiz"); // ← AJOUT Phase 17
 
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("5");
@@ -42,6 +44,10 @@ export default function QuizScreen() {
   const [phase, setPhase] = useState<"setup" | "playing" | "result">("setup");
   const [generating, setGenerating] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
+
+  useEffect(() => {
+    trackView(); // ← AJOUT Phase 17
+  }, []);
 
   const resultMessage = () => {
     if (score >= questions.length * 0.8) {
@@ -65,51 +71,52 @@ export default function QuizScreen() {
   };
 
   const handleGenerate = async () => {
-  if (topic.trim().length < 2) {
-    Alert.alert(t("error"), "Saisis un sujet pour le quiz.");
-    return;
-  }
+    if (topic.trim().length < 2) {
+      Alert.alert(t("error"), "Saisis un sujet pour le quiz.");
+      return;
+    }
 
-  const allowed = await checkAndConsume();
-  if (!allowed) return;
+    const allowed = await checkAndConsume();
+    if (!allowed) return;
 
-  // Phase 15 — limiter input
-  const { text: limitedTopic } = limitInput(topic, "quiz");
+    const { text: limitedTopic } = limitInput(topic, "quiz");
 
-  // Phase 15 — vérifier cache
-  const cacheInput = { topic: limitedTopic, count, language: currentLanguage };
-  const cached = await readAICache("quiz", cacheInput);
-  if (cached?.questions?.length > 0) {
-    setQuestions(cached.questions);
-    setCurrentIndex(0);
-    setScore(0);
-    setSelectedAnswer(null);
-    setShowAnswer(false);
-    setPhase("playing");
-    return;
-  }
+    const cacheInput = { topic: limitedTopic, count, language: currentLanguage };
+    const cached = await readAICache("quiz", cacheInput);
+    if (cached?.questions?.length > 0) {
+      endTracking(true, true); // ← AJOUT Phase 17 — cache hit
+      setQuestions(cached.questions);
+      setCurrentIndex(0);
+      setScore(0);
+      setSelectedAnswer(null);
+      setShowAnswer(false);
+      setPhase("playing");
+      return;
+    }
 
-  setGenerating(true);
-  try {
-    const fn = httpsCallable(functions, "generateQuiz");
-    const res = await fn({ topic: limitedTopic, count: parseInt(count), language: currentLanguage });
-    const data = res.data as any;
-    const qs: QuizQuestion[] = data.questions || [];
-    if (qs.length === 0) throw new Error("Aucune question générée.");
-    setQuestions(qs);
-    setCurrentIndex(0);
-    setScore(0);
-    setSelectedAnswer(null);
-    setShowAnswer(false);
-    setPhase("playing");
-    // Phase 15 — sauvegarder cache
-    await writeAICache("quiz", cacheInput, data);
-  } catch (e: any) {
-    Alert.alert(t("error"), e.message || "Génération échouée.");
-  } finally {
-    setGenerating(false);
-  }
-};
+    startTracking(); // ← AJOUT Phase 17
+    setGenerating(true);
+    try {
+      const fn = httpsCallable(functions, "generateQuiz");
+      const res = await fn({ topic: limitedTopic, count: parseInt(count), language: currentLanguage });
+      const data = res.data as any;
+      const qs: QuizQuestion[] = data.questions || [];
+      if (qs.length === 0) throw new Error("Aucune question générée.");
+      setQuestions(qs);
+      setCurrentIndex(0);
+      setScore(0);
+      setSelectedAnswer(null);
+      setShowAnswer(false);
+      setPhase("playing");
+      await writeAICache("quiz", cacheInput, data);
+      endTracking(true); // ← AJOUT Phase 17 — succès
+    } catch (e: any) {
+      endTracking(false); // ← AJOUT Phase 17 — échec
+      Alert.alert(t("error"), e.message || "Génération échouée.");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleAnswer = (index: number) => {
     if (selectedAnswer !== null) return;
@@ -175,7 +182,6 @@ export default function QuizScreen() {
           </View>
         </View>
 
-        {/* ── Phase 14 : Bandeau usage ── */}
         <UsageBanner isRTL={isRTL} />
 
         {/* Setup */}
@@ -272,7 +278,6 @@ export default function QuizScreen() {
               </Text>
             </View>
 
-            {/* Barre progression */}
             <View style={{ height: 4, backgroundColor: "#E5E7EB", borderRadius: 2, marginBottom: 20 }}>
               <View style={{
                 height: 4, borderRadius: 2, backgroundColor: "#6366F1",
@@ -280,7 +285,6 @@ export default function QuizScreen() {
               }} />
             </View>
 
-            {/* Question */}
             <View style={{
               backgroundColor: "#EEF2FF", borderRadius: 14, padding: 20, marginBottom: 20,
             }}>
@@ -293,7 +297,6 @@ export default function QuizScreen() {
               </Text>
             </View>
 
-            {/* Options */}
             {q.options.map((option, i) => {
               let bg = "#FFF", border = "#E5E7EB", textColor = "#374151";
               if (showAnswer) {
@@ -338,7 +341,6 @@ export default function QuizScreen() {
               );
             })}
 
-            {/* Explication */}
             {showAnswer && q.explanation && (
               <View style={{
                 backgroundColor: "#FFFBEB", borderRadius: 12, padding: 14,
@@ -358,7 +360,6 @@ export default function QuizScreen() {
               </View>
             )}
 
-            {/* Bouton suivant */}
             {showAnswer && (
               <TouchableOpacity
                 onPress={handleNext}
