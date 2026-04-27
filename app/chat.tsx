@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
 import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
+import { limitInput } from "../utils/inputLimiter"; // ← Phase 15
 
 const COURSES_FR = [
   "Mathématiques", "Physique", "Chimie",
@@ -145,12 +146,16 @@ export default function ChatScreen() {
     const allowed = await checkAndConsume(); // ← AJOUT Phase 14
     if (!allowed) return;                    // ← AJOUT Phase 14
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: message.trim(),
-      timestamp: new Date().toISOString(),
-    };
+    // Phase 15 — limiter la taille du message
+  const { text: limitedMessage } = limitInput(message.trim(), "chat");
+
+  const userMessage: ChatMessage = {
+    id: Date.now().toString(),
+    role: "user",
+    content: limitedMessage, // ← était message.trim()
+    timestamp: new Date().toISOString(),
+  };
+
 
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);

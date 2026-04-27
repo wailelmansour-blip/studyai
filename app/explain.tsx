@@ -16,6 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
 import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
+import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
+import { limitInput, getTruncationMessage } from "../utils/inputLimiter"; // ← Phase 15
 
 export default function ExplainScreen() {
   const app = getApp();
@@ -46,35 +48,58 @@ export default function ExplainScreen() {
   };
 
   const handleExplain = async () => {
-    if (text.trim().length < 10) {
-      Alert.alert(t("error"), "Saisis au moins 10 caractères.");
-      return;
-    }
+  if (text.trim().length < 10) {
+    Alert.alert(t("error"), "Saisis au moins 10 caractères.");
+    return;
+  }
 
-    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
-    if (!allowed) return;                    // ← AJOUT Phase 14
+  const allowed = await checkAndConsume();
+  if (!allowed) return;
 
-    setGenerating(true);
-    setResult(null);
-    setSaved(false);
-    try {
-      const fn = httpsCallable(functions, "explainText");
-      const res = await fn({ text, difficulty, language: currentLanguage });
-      const data = res.data as any;
-      setResult({
-        userId: auth.currentUser?.uid || "anonymous",
-        inputText: text,
-        explanation: data.explanation || "",
-        keyPoints: data.keyPoints || [],
-        difficulty: data.difficulty || difficulty,
-        createdAt: new Date().toISOString(),
-      });
-    } catch (e: any) {
-      Alert.alert(t("error"), e.message || "La génération a échoué.");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  // Phase 15 — limiter input
+  const { text: limitedText, wasTruncated } = limitInput(text, "explain");
+  if (wasTruncated) {
+    Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 2000));
+  }
+
+  // Phase 15 — vérifier cache
+  const cacheInput = { text: limitedText, difficulty, language: currentLanguage };
+  const cached = await readAICache("explain", cacheInput);
+  if (cached) {
+    setResult({
+      userId: auth.currentUser?.uid || "anonymous",
+      inputText: text,
+      explanation: cached.explanation || "",
+      keyPoints: cached.keyPoints || [],
+      difficulty: cached.difficulty || difficulty,
+      createdAt: new Date().toISOString(),
+    });
+    return;
+  }
+
+  setGenerating(true);
+  setResult(null);
+  setSaved(false);
+  try {
+    const fn = httpsCallable(functions, "explainText");
+    const res = await fn({ text: limitedText, difficulty, language: currentLanguage });
+    const data = res.data as any;
+    setResult({
+      userId: auth.currentUser?.uid || "anonymous",
+      inputText: text,
+      explanation: data.explanation || "",
+      keyPoints: data.keyPoints || [],
+      difficulty: data.difficulty || difficulty,
+      createdAt: new Date().toISOString(),
+    });
+    // Phase 15 — sauvegarder cache
+    await writeAICache("explain", cacheInput, data);
+  } catch (e: any) {
+    Alert.alert(t("error"), e.message || "La génération a échoué.");
+  } finally {
+    setGenerating(false);
+  }
+};
 
   const handleSave = async () => {
     if (!result) return;

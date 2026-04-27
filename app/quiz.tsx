@@ -14,6 +14,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
 import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
+import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
+import { limitInput } from "../utils/inputLimiter";                // ← Phase 15
 
 interface QuizQuestion {
   question: string;
@@ -63,33 +65,51 @@ export default function QuizScreen() {
   };
 
   const handleGenerate = async () => {
-    if (topic.trim().length < 2) {
-      Alert.alert(t("error"), "Saisis un sujet pour le quiz.");
-      return;
-    }
+  if (topic.trim().length < 2) {
+    Alert.alert(t("error"), "Saisis un sujet pour le quiz.");
+    return;
+  }
 
-    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
-    if (!allowed) return;                    // ← AJOUT Phase 14
+  const allowed = await checkAndConsume();
+  if (!allowed) return;
 
-    setGenerating(true);
-    try {
-      const fn = httpsCallable(functions, "generateQuiz");
-      const res = await fn({ topic, count: parseInt(count), language: currentLanguage });
-      const data = res.data as any;
-      const qs: QuizQuestion[] = data.questions || [];
-      if (qs.length === 0) throw new Error("Aucune question générée.");
-      setQuestions(qs);
-      setCurrentIndex(0);
-      setScore(0);
-      setSelectedAnswer(null);
-      setShowAnswer(false);
-      setPhase("playing");
-    } catch (e: any) {
-      Alert.alert(t("error"), e.message || "Génération échouée.");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  // Phase 15 — limiter input
+  const { text: limitedTopic } = limitInput(topic, "quiz");
+
+  // Phase 15 — vérifier cache
+  const cacheInput = { topic: limitedTopic, count, language: currentLanguage };
+  const cached = await readAICache("quiz", cacheInput);
+  if (cached?.questions?.length > 0) {
+    setQuestions(cached.questions);
+    setCurrentIndex(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowAnswer(false);
+    setPhase("playing");
+    return;
+  }
+
+  setGenerating(true);
+  try {
+    const fn = httpsCallable(functions, "generateQuiz");
+    const res = await fn({ topic: limitedTopic, count: parseInt(count), language: currentLanguage });
+    const data = res.data as any;
+    const qs: QuizQuestion[] = data.questions || [];
+    if (qs.length === 0) throw new Error("Aucune question générée.");
+    setQuestions(qs);
+    setCurrentIndex(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowAnswer(false);
+    setPhase("playing");
+    // Phase 15 — sauvegarder cache
+    await writeAICache("quiz", cacheInput, data);
+  } catch (e: any) {
+    Alert.alert(t("error"), e.message || "Génération échouée.");
+  } finally {
+    setGenerating(false);
+  }
+};
 
   const handleAnswer = (index: number) => {
     if (selectedAnswer !== null) return;

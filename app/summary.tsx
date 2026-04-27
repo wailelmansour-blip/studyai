@@ -16,6 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
 import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
+import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
+import { limitInput, getTruncationMessage } from "../utils/inputLimiter"; // ← Phase 15
 
 const CACHE_KEY = "studyai_summaries";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -98,29 +100,48 @@ export default function SummaryScreen() {
 }, []);
 
   const handleSummarize = async () => {
-    if (inputText.trim().length < 20) {
-      Alert.alert(t("error"), "Saisis au moins 20 caractères à résumer.");
-      return;
-    }
+  if (inputText.trim().length < 20) {
+    Alert.alert(t("error"), "Saisis au moins 20 caractères à résumer.");
+    return;
+  }
 
-    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
-    if (!allowed) return;                    // ← AJOUT Phase 14
+  // Phase 14 — limite IA
+  const allowed = await checkAndConsume();
+  if (!allowed) return;
 
-    setIsLoading(true);
-    setSummary("");
-    setIsSaved(false);
-    setIsFromCache(false);
-    try {
-      const fn = httpsCallable(functions, "summarize");
-      const res = await fn({ text: inputText, language: currentLanguage });
-      const data = res.data as any;
-      setSummary(data.summary || "");
-    } catch (e: any) {
-      Alert.alert(t("error"), e.message || "La génération a échoué.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Phase 15 — limiter la taille de l'input
+  const { text: limitedText, wasTruncated } = limitInput(inputText, "summary");
+  if (wasTruncated) {
+    Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 3000));
+  }
+
+  // Phase 15 — vérifier le cache avant d'appeler l'IA
+  const cacheInput = { text: limitedText, language: currentLanguage };
+  const cached = await readAICache("summary", cacheInput);
+  if (cached) {
+    setSummary(cached.summary || "");
+    setIsFromCache(true);
+    setIsLoading(false);
+    return;
+  }
+
+  setIsLoading(true);
+  setSummary("");
+  setIsSaved(false);
+  setIsFromCache(false);
+  try {
+    const fn = httpsCallable(functions, "summarize");
+    const res = await fn({ text: limitedText, language: currentLanguage });
+    const data = res.data as any;
+    setSummary(data.summary || "");
+    // Phase 15 — sauvegarder dans le cache
+    await writeAICache("summary", cacheInput, data);
+  } catch (e: any) {
+    Alert.alert(t("error"), e.message || "La génération a échoué.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleSave = async () => {
     if (!summary) return;

@@ -16,6 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
 import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
+import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
+import { limitInput } from "../utils/inputLimiter";                // ← Phase 15
 
 export default function FlashcardsScreen() {
   const app = getApp();
@@ -36,35 +38,55 @@ export default function FlashcardsScreen() {
   const [currentCard, setCurrentCard] = useState(0);
 
   const handleGenerate = async () => {
-    if (topic.trim().length < 3) {
-      Alert.alert(t("error"), "Saisis un sujet pour les flashcards.");
-      return;
-    }
+  if (topic.trim().length < 3) {
+    Alert.alert(t("error"), "Saisis un sujet pour les flashcards.");
+    return;
+  }
 
-    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
-    if (!allowed) return;                    // ← AJOUT Phase 14
+  const allowed = await checkAndConsume();
+  if (!allowed) return;
 
-    setGenerating(true);
-    setResult(null);
-    setSaved(false);
+  // Phase 15 — limiter input
+  const { text: limitedTopic } = limitInput(topic, "flashcards");
+
+  // Phase 15 — vérifier cache
+  const cacheInput = { topic: limitedTopic, count, language: currentLanguage };
+  const cached = await readAICache("flashcards", cacheInput);
+  if (cached?.flashcards?.length > 0) {
+    setResult({
+      userId: auth.currentUser?.uid || "anonymous",
+      topic,
+      flashcards: cached.flashcards,
+      createdAt: new Date().toISOString(),
+    });
     setFlipped({});
     setCurrentCard(0);
-    try {
-      const fn = httpsCallable(functions, "generateFlashcards");
-      const res = await fn({ topic, count: parseInt(count), language: currentLanguage });
-      const data = res.data as any;
-      setResult({
-        userId: auth.currentUser?.uid || "anonymous",
-        topic,
-        flashcards: data.flashcards || [],
-        createdAt: new Date().toISOString(),
-      });
-    } catch (e: any) {
-      Alert.alert(t("error"), e.message || "La génération a échoué.");
-    } finally {
-      setGenerating(false);
-    }
-  };
+    return;
+  }
+
+  setGenerating(true);
+  setResult(null);
+  setSaved(false);
+  setFlipped({});
+  setCurrentCard(0);
+  try {
+    const fn = httpsCallable(functions, "generateFlashcards");
+    const res = await fn({ topic: limitedTopic, count: parseInt(count), language: currentLanguage });
+    const data = res.data as any;
+    setResult({
+      userId: auth.currentUser?.uid || "anonymous",
+      topic,
+      flashcards: data.flashcards || [],
+      createdAt: new Date().toISOString(),
+    });
+    // Phase 15 — sauvegarder cache
+    await writeAICache("flashcards", cacheInput, data);
+  } catch (e: any) {
+    Alert.alert(t("error"), e.message || "La génération a échoué.");
+  } finally {
+    setGenerating(false);
+  }
+};
 
   const handleSave = async () => {
     if (!result) return;

@@ -16,6 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
 import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
+import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
+import { limitInput, getTruncationMessage } from "../utils/inputLimiter"; // ← Phase 15
 
 export default function SolveScreen() {
   const app = getApp();
@@ -41,35 +43,58 @@ export default function SolveScreen() {
       : ["Maths", "Physique", "Chimie", "Info", "Autre"];
 
   const handleSolve = async () => {
-    if (exercise.trim().length < 5) {
-      Alert.alert(t("error"), "Saisis l'exercice à résoudre.");
-      return;
-    }
+  if (exercise.trim().length < 5) {
+    Alert.alert(t("error"), "Saisis l'exercice à résoudre.");
+    return;
+  }
 
-    const allowed = await checkAndConsume(); // ← AJOUT Phase 14
-    if (!allowed) return;                    // ← AJOUT Phase 14
+  const allowed = await checkAndConsume();
+  if (!allowed) return;
 
-    setGenerating(true);
-    setResult(null);
-    setSaved(false);
-    try {
-      const fn = httpsCallable(functions, "solveExercise");
-      const res = await fn({ exercise, subject, language: currentLanguage });
-      const data = res.data as any;
-      setResult({
-        userId: auth.currentUser?.uid || "anonymous",
-        exercise,
-        solution: data.solution || "",
-        steps: data.steps || [],
-        subject: data.subject || subject || "Général",
-        createdAt: new Date().toISOString(),
-      });
-    } catch (e: any) {
-      Alert.alert(t("error"), e.message || "La résolution a échoué.");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  // Phase 15 — limiter input
+  const { text: limitedExercise, wasTruncated } = limitInput(exercise, "solve");
+  if (wasTruncated) {
+    Alert.alert("ℹ️", getTruncationMessage(currentLanguage, 1500));
+  }
+
+  // Phase 15 — vérifier cache
+  const cacheInput = { exercise: limitedExercise, subject, language: currentLanguage };
+  const cached = await readAICache("solve", cacheInput);
+  if (cached) {
+    setResult({
+      userId: auth.currentUser?.uid || "anonymous",
+      exercise,
+      solution: cached.solution || "",
+      steps: cached.steps || [],
+      subject: cached.subject || subject || "Général",
+      createdAt: new Date().toISOString(),
+    });
+    return;
+  }
+
+  setGenerating(true);
+  setResult(null);
+  setSaved(false);
+  try {
+    const fn = httpsCallable(functions, "solveExercise");
+    const res = await fn({ exercise: limitedExercise, subject, language: currentLanguage });
+    const data = res.data as any;
+    setResult({
+      userId: auth.currentUser?.uid || "anonymous",
+      exercise,
+      solution: data.solution || "",
+      steps: data.steps || [],
+      subject: data.subject || subject || "Général",
+      createdAt: new Date().toISOString(),
+    });
+    // Phase 15 — sauvegarder cache
+    await writeAICache("solve", cacheInput, data);
+  } catch (e: any) {
+    Alert.alert(t("error"), e.message || "La résolution a échoué.");
+  } finally {
+    setGenerating(false);
+  }
+};
 
   const handleSave = async () => {
     if (!result) return;
