@@ -97,15 +97,33 @@ export default function SolveScreen() {
 };
 
   const handleSave = async () => {
-    if (!result) return;
-    try {
-      await saveSolution(result);
-      setSaved(true);
-      Alert.alert("✅", t("saved"));
-    } catch {
-      Alert.alert(t("error"), "La sauvegarde a échoué.");
-    }
-  };
+  if (!result) return;
+
+  const user = auth.currentUser;
+  if (!user) {
+    Alert.alert(
+      t("error"),
+      currentLanguage === "ar" ? "يجب تسجيل الدخول للحفظ"
+      : currentLanguage === "en" ? "You must be logged in to save"
+      : "Tu dois être connecté pour sauvegarder."
+    );
+    return;
+  }
+
+  try {
+    await saveSolution(result);
+    setSaved(true);
+    Alert.alert("✅", t("saved"));
+  } catch (e: any) {
+    console.error("Erreur sauvegarde solution:", e);
+    Alert.alert(
+      t("error"),
+      currentLanguage === "ar"
+        ? `فشل الحفظ.\n\n${e?.message || e?.code || "خطأ غير معروف"}`
+        : currentLanguage === "en"
+        ? `Save failed.\n\n${e?.message || e?.code || "Unknown error"}`
+        : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
+    );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>

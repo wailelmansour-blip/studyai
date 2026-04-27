@@ -15,11 +15,11 @@ import { usePlanStore } from "../store/planStore";
 import { StudyPlan, StudySession, GeneratePlanInput } from "../types/plan";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
-import { useAIRequest } from "../hooks/useAIRequest";    // ← AJOUT Phase 14
-import { UsageBanner } from "../components/UsageBanner"; // ← AJOUT Phase 14
-import { readAICache, writeAICache } from "../store/aiCacheStore"; // ← Phase 15
-import { limitInput } from "../utils/inputLimiter";                // ← Phase 15
-import { schedulePlanAlert } from "../services/notifications"; // ← Phase 16
+import { useAIRequest } from "../hooks/useAIRequest";
+import { UsageBanner } from "../components/UsageBanner";
+import { readAICache, writeAICache } from "../store/aiCacheStore";
+import { limitInput } from "../utils/inputLimiter";
+import { schedulePlanAlert } from "../services/notifications";
 
 export default function PlanScreen() {
   const app = getApp();
@@ -29,7 +29,7 @@ export default function PlanScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
-  const { checkAndConsume } = useAIRequest(); // ← AJOUT Phase 14
+  const { checkAndConsume } = useAIRequest();
 
   const [subjects, setSubjects] = useState<string[]>([""]);
   const [examDate, setExamDate] = useState<Date>(
@@ -73,125 +73,140 @@ export default function PlanScreen() {
   };
 
   const handleGenerate = async () => {
-  const validSubjects = subjects.filter((s) => s.trim().length > 0);
-  if (validSubjects.length === 0) {
-    Alert.alert(t("error"), "Ajoute au moins une matière.");
-    return;
-  }
-  const hours = parseFloat(hoursPerDay);
-  if (isNaN(hours) || hours < 0.5 || hours > 12) {
-    Alert.alert(t("error"), "Heures par jour : entre 0.5 et 12.");
-    return;
-  }
+    const validSubjects = subjects.filter((s) => s.trim().length > 0);
+    if (validSubjects.length === 0) {
+      Alert.alert(t("error"), "Ajoute au moins une matière.");
+      return;
+    }
+    const hours = parseFloat(hoursPerDay);
+    if (isNaN(hours) || hours < 0.5 || hours > 12) {
+      Alert.alert(t("error"), "Heures par jour : entre 0.5 et 12.");
+      return;
+    }
 
-  const allowed = await checkAndConsume();
-  if (!allowed) return;
+    const allowed = await checkAndConsume();
+    if (!allowed) return;
 
-  // Phase 15 — limiter chaque matière à 100 caractères
-  const limitedSubjects = validSubjects.map(
-    (s) => limitInput(s, "plan").text
-  );
+    const limitedSubjects = validSubjects.map((s) => limitInput(s, "plan").text);
 
-  // Phase 15 — vérifier cache
-  const cacheInput = {
-    subjects: limitedSubjects,
-    examDate: examDate.toISOString().split("T")[0], // juste la date YYYY-MM-DD
-    hoursPerDay: hours,
-    language: currentLanguage,
-  };
-  const cached = await readAICache("plan", cacheInput);
-  if (cached) {
-    const sessions: StudySession[] = [];
-    const schedule = cached.schedule || {};
-    Object.entries(schedule).forEach(([day, items]: [string, any]) => {
-      if (!items || items.length === 0) return;
-      items.forEach((item: any) => {
-        sessions.push({
-          day,
-          subject: item.subject || "",
-          duration: parseInt(item.duration) || 60,
-          tasks: item.task ? [item.task] : [],
-          completed: false,
-        });
-      });
-    });
-    setGeneratedPlan({
-      userId: auth.currentUser?.uid || "anonymous",
+    const cacheInput = {
       subjects: limitedSubjects,
-      examDate: examDate.toISOString(),
-      totalDays: daysUntilExam(),
-      sessions,
-      title: cached.plan || `Plan — ${limitedSubjects.join(", ")}`,
-      createdAt: new Date().toISOString(),
-      tips: cached.tips || [],
-    });
-    return;
-  }
-
-  setGenerating(true);
-  setGeneratedPlan(null);
-  setSaved(false);
-  try {
-    const generatePlanFn = httpsCallable(functions, "generatePlan");
-    const input: GeneratePlanInput = {
-      subjects: limitedSubjects,
-      examDate: examDate.toISOString(),
+      examDate: examDate.toISOString().split("T")[0],
       hoursPerDay: hours,
+      language: currentLanguage,
     };
-    const result = await generatePlanFn({ ...input, language: currentLanguage });
-    const data = result.data as any;
-
-    const sessions: StudySession[] = [];
-    const schedule = data.schedule || {};
-    Object.entries(schedule).forEach(([day, items]: [string, any]) => {
-      if (!items || items.length === 0) return;
-      items.forEach((item: any) => {
-        sessions.push({
-          day,
-          subject: item.subject || "",
-          duration: parseInt(item.duration) || 60,
-          tasks: item.task ? [item.task] : [],
-          completed: false,
+    const cached = await readAICache("plan", cacheInput);
+    if (cached) {
+      const sessions: StudySession[] = [];
+      const schedule = cached.schedule || {};
+      Object.entries(schedule).forEach(([day, items]: [string, any]) => {
+        if (!items || items.length === 0) return;
+        items.forEach((item: any) => {
+          sessions.push({
+            day,
+            subject: item.subject || "",
+            duration: parseInt(item.duration) || 60,
+            tasks: item.task ? [item.task] : [],
+            completed: false,
+          });
         });
       });
-    });
+      setGeneratedPlan({
+        userId: auth.currentUser?.uid || "anonymous",
+        subjects: limitedSubjects,
+        examDate: examDate.toISOString(),
+        totalDays: daysUntilExam(),
+        sessions,
+        title: cached.plan || `Plan — ${limitedSubjects.join(", ")}`,
+        createdAt: new Date().toISOString(),
+        tips: cached.tips || [],
+      });
+      return;
+    }
 
-    const plan: StudyPlan = {
-      userId: auth.currentUser?.uid || "anonymous",
-      subjects: limitedSubjects,
-      examDate: examDate.toISOString(),
-      totalDays: daysUntilExam(),
-      sessions,
-      title: data.plan || `Plan — ${limitedSubjects.join(", ")}`,
-      createdAt: new Date().toISOString(),
-      tips: data.tips || [],
-    };
-    setGeneratedPlan(plan);
+    setGenerating(true);
+    setGeneratedPlan(null);
+    setSaved(false);
+    try {
+      const generatePlanFn = httpsCallable(functions, "generatePlan");
+      const input: GeneratePlanInput = {
+        subjects: limitedSubjects,
+        examDate: examDate.toISOString(),
+        hoursPerDay: hours,
+      };
+      const result = await generatePlanFn({ ...input, language: currentLanguage });
+      const data = result.data as any;
 
-    // Phase 16 — planifier l'alerte J-1 avant l'examen
-await schedulePlanAlert(
-  examDate.toISOString(),
-  limitedSubjects,
-  currentLanguage
-).catch(() => {}); // silencieux si permission refusée
+      const sessions: StudySession[] = [];
+      const schedule = data.schedule || {};
+      Object.entries(schedule).forEach(([day, items]: [string, any]) => {
+        if (!items || items.length === 0) return;
+        items.forEach((item: any) => {
+          sessions.push({
+            day,
+            subject: item.subject || "",
+            duration: parseInt(item.duration) || 60,
+            tasks: item.task ? [item.task] : [],
+            completed: false,
+          });
+        });
+      });
 
-    // Phase 15 — sauvegarder cache
-    await writeAICache("plan", cacheInput, data);
-  } catch (error: any) {
-    Alert.alert(t("error"), error.message || "La génération a échoué.");
-  } finally {
-    setGenerating(false);
-  }
-};
+      const plan: StudyPlan = {
+        userId: auth.currentUser?.uid || "anonymous",
+        subjects: limitedSubjects,
+        examDate: examDate.toISOString(),
+        totalDays: daysUntilExam(),
+        sessions,
+        title: data.plan || `Plan — ${limitedSubjects.join(", ")}`,
+        createdAt: new Date().toISOString(),
+        tips: data.tips || [],
+      };
+      setGeneratedPlan(plan);
 
+      await schedulePlanAlert(
+        examDate.toISOString(),
+        limitedSubjects,
+        currentLanguage
+      ).catch(() => {});
+
+      await writeAICache("plan", cacheInput, data);
+    } catch (error: any) {
+      Alert.alert(t("error"), error.message || "La génération a échoué.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // ── CORRECTION Phase 16 : handleSave avec traductions ──
   const handleSave = async () => {
     if (!generatedPlan) return;
+
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert(
+        t("error"),
+        currentLanguage === "ar" ? "يجب تسجيل الدخول للحفظ"
+        : currentLanguage === "en" ? "You must be logged in to save"
+        : "Tu dois être connecté pour sauvegarder."
+      );
+      return;
+    }
+
     try {
       await savePlan(generatedPlan);
       setSaved(true);
       Alert.alert("✅", t("saved"));
-    } catch {
-      Alert.alert(t("error"), "La sauvegarde a échoué.");
+    } catch (e: any) {
+      console.error("Erreur sauvegarde plan:", e);
+      Alert.alert(
+        t("error"),
+        currentLanguage === "ar"
+          ? `فشل الحفظ.\n\n${e?.message || e?.code || "خطأ غير معروف"}`
+          : currentLanguage === "en"
+          ? `Save failed.\n\n${e?.message || e?.code || "Unknown error"}`
+          : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
+      );
     }
   };
 
@@ -236,7 +251,6 @@ await schedulePlanAlert(
           </View>
         </View>
 
-        {/* ── Phase 14 : Bandeau usage ── */}
         <UsageBanner isRTL={isRTL} />
 
         {/* Form */}
