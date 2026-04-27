@@ -125,4 +125,13 @@ export default {
   new: "جديد",
   back: "رجوع",
   generated_by: "مولّد بـ AI · GPT-4o-mini",
+
+  //phase 18
+  summary_desc: "لخّص دروسك في ثوانٍ",
+explain_desc: "افهم أي مفهوم بسهولة",
+solve_desc: "حل التمارين خطوة بخطوة",
+flashcards_desc: "احفظ باستخدام البطاقات الذكية",
+quiz_desc: "اختبر معلوماتك",
+plan_desc: "خطط لجلسات مراجعتك",
+chat_desc: "اطرح أسئلة دروسك",
 };

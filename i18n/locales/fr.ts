@@ -125,4 +125,13 @@ export default {
   new: "Nouveau",
   back: "Retour",
   generated_by: "Généré par IA · GPT-4o-mini",
+
+  //phase 18:
+  summary_desc: "Résume tes cours en quelques secondes",
+explain_desc: "Comprends n'importe quel concept",
+solve_desc: "Résous tes exercices étape par étape",
+flashcards_desc: "Mémorise avec des cartes intelligentes",
+quiz_desc: "Teste tes connaissances",
+plan_desc: "Planifie tes révisions",
+chat_desc: "Pose tes questions de cours",
 };

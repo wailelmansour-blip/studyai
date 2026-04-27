@@ -1,16 +1,14 @@
 // components/UsageBanner.tsx
-import React, { useEffect } from "react"; // ← useEffect ajouté
+import React, { useEffect } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useUsageStore } from "../store/usageStore";
 import { LIMITS } from "../types/usage";
 import { useLanguageStore } from "../store/languageStore";
 import { router } from "expo-router";
-import { trackConversion } from "../services/analytics"; // ← AJOUT Phase 17
+import { trackConversion } from "../services/analytics";
 
-interface Props {
-  isRTL?: boolean;
-}
+interface Props { isRTL?: boolean; }
 
 export const UsageBanner: React.FC<Props> = ({ isRTL = false }) => {
   const { usage } = useUsageStore();
@@ -25,106 +23,83 @@ export const UsageBanner: React.FC<Props> = ({ isRTL = false }) => {
   const isAlmostDone = remaining <= 1 && !isPremium;
   const isDone = remaining === 0;
 
-  // ── Phase 17 : tracker quand la limite est atteinte ──
   useEffect(() => {
-    if (isDone) {
-      trackConversion("limit_reached").catch(() => {}); // ← AJOUT Phase 17
-    }
+    if (isDone) trackConversion("limit_reached").catch(() => {});
   }, [isDone]);
 
   const getLabel = () => {
-    if (currentLanguage === "ar") {
-      return isDone
-        ? "تم الوصول إلى الحد اليومي"
-        : `${remaining} طلب متبقي من ${limit}`;
-    }
-    if (currentLanguage === "en") {
-      return isDone
-        ? "Daily limit reached"
-        : `${remaining} of ${limit} requests left`;
-    }
-    return isDone
-      ? "Limite journalière atteinte"
-      : `${remaining} / ${limit} requêtes restantes`;
+    if (currentLanguage === "ar")
+      return isDone ? "تم الوصول إلى الحد اليومي" : `${remaining} طلب متبقي من ${limit}`;
+    if (currentLanguage === "en")
+      return isDone ? "Daily limit reached" : `${remaining} of ${limit} requests left`;
+    return isDone ? "Limite atteinte" : `${remaining} / ${limit} requêtes restantes`;
   };
 
-  const getUpgradeLabel = () => {
-    if (currentLanguage === "ar") return "ترقية";
-    if (currentLanguage === "en") return "Upgrade";
-    return "Passer au premium";
-  };
+  const getUpgradeLabel = () =>
+    currentLanguage === "ar" ? "ترقية ✨"
+    : currentLanguage === "en" ? "Upgrade ✨"
+    : "Premium ✨";
 
-  const getBgColor = () => {
-    if (isDone) return "#FEF2F2";
-    if (isAlmostDone) return "#FFFBEB";
-    if (isPremium) return "#F0FDF4";
-    return "#EEF2FF";
-  };
-
-  const getTextColor = () => {
-    if (isDone) return "#991B1B";
-    if (isAlmostDone) return "#92400E";
-    if (isPremium) return "#065F46";
-    return "#3730A3";
-  };
-
-  const getBarColor = () => {
-    if (isDone) return "#EF4444";
-    if (isAlmostDone) return "#F59E0B";
-    if (isPremium) return "#10B981";
-    return "#6366F1";
-  };
-
-  const getIcon = (): any => {
-    if (isDone) return "warning";
-    if (isPremium) return "star";
-    return "flash";
-  };
+  // Couleurs selon état
+  const config = isDone
+    ? { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B", bar: "#EF4444", icon: "warning" as any }
+    : isAlmostDone
+    ? { bg: "#FFFBEB", border: "#FDE68A", text: "#92400E", bar: "#F59E0B", icon: "warning-outline" as any }
+    : isPremium
+    ? { bg: "#F0FDF4", border: "#BBF7D0", text: "#065F46", bar: "#10B981", icon: "star" as any }
+    : { bg: "#EEF2FF", border: "#C7D2FE", text: "#3730A3", bar: "#6366F1", icon: "flash" as any };
 
   return (
     <View style={{
-      backgroundColor: getBgColor(),
-      borderRadius: 10, padding: 10, marginBottom: 14,
+      backgroundColor: config.bg,
+      borderRadius: 14, padding: 12, marginBottom: 16,
+      borderWidth: 1, borderColor: config.border,
     }}>
-      {/* Ligne principale */}
       <View style={{
         flexDirection: isRTL ? "row-reverse" : "row",
         alignItems: "center", justifyContent: "space-between",
+        marginBottom: 8,
       }}>
         <View style={{
           flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center", gap: 6, flex: 1,
         }}>
-          <Ionicons name={getIcon()} size={14} color={getTextColor()} />
-          <Text style={{ fontSize: 12, fontWeight: "600", color: getTextColor() }}>
+          <View style={{
+            width: 24, height: 24, borderRadius: 8,
+            backgroundColor: config.bar + "20",
+            alignItems: "center", justifyContent: "center",
+          }}>
+            <Ionicons name={config.icon} size={13} color={config.bar} />
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: config.text, flex: 1 }}>
             {getLabel()}
           </Text>
           {isPremium && (
             <View style={{
-              backgroundColor: "#10B981", borderRadius: 4,
-              paddingHorizontal: 6, paddingVertical: 1,
+              backgroundColor: "#10B981", borderRadius: 6,
+              paddingHorizontal: 8, paddingVertical: 2,
             }}>
-              <Text style={{ fontSize: 10, color: "#fff", fontWeight: "700" }}>
+              <Text style={{ fontSize: 10, color: "#fff", fontWeight: "800", letterSpacing: 0.5 }}>
                 PREMIUM
               </Text>
             </View>
           )}
         </View>
 
-        {/* Bouton upgrade si free et presque à la limite */}
         {!isPremium && isAlmostDone && (
           <TouchableOpacity
             onPress={() => {
-              trackConversion("upgrade_view").catch(() => {}); // ← AJOUT Phase 17
+              trackConversion("upgrade_view").catch(() => {});
               router.push("/profile");
             }}
             style={{
-              backgroundColor: "#6366F1", borderRadius: 6,
-              paddingHorizontal: 8, paddingVertical: 3,
+              backgroundColor: "#6366F1", borderRadius: 8,
+              paddingHorizontal: 10, paddingVertical: 4,
+              marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0,
             }}
           >
             <Text style={{ fontSize: 11, color: "#fff", fontWeight: "700" }}>
-              {getUpgradeLabel()} ✨
+              {getUpgradeLabel()}
             </Text>
           </TouchableOpacity>
         )}
@@ -132,12 +107,12 @@ export const UsageBanner: React.FC<Props> = ({ isRTL = false }) => {
 
       {/* Barre de progression */}
       <View style={{
-        marginTop: 6, height: 4, backgroundColor: "#E5E7EB",
-        borderRadius: 2, overflow: "hidden",
+        height: 5, backgroundColor: config.bar + "20",
+        borderRadius: 3, overflow: "hidden",
       }}>
         <View style={{
-          height: 4, width: `${percent}%`,
-          backgroundColor: getBarColor(), borderRadius: 2,
+          height: 5, width: `${percent}%`,
+          backgroundColor: config.bar, borderRadius: 3,
         }} />
       </View>
     </View>
