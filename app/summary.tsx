@@ -22,11 +22,12 @@ import { useAIRequest } from "../hooks/useAIRequest";
 import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
+import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 
 const CACHE_KEY = "studyai_summaries";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
-const MAX_CACHE_ITEMS = 10; // ← augmenté de 5 à 10
-const PAGE_SIZE = 5;        // ← items affichés par page
+const MAX_CACHE_ITEMS = 10;
+const PAGE_SIZE = 5;
 
 interface CachedSummary {
   id: string;
@@ -46,6 +47,7 @@ export default function SummaryScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { startTracking, endTracking, trackConv, trackView } = useAnalytics("summary"); // ← AJOUT Phase 17
 
   const [inputText, setInputText] = useState("");
   const [summary, setSummary] = useState("");
@@ -54,20 +56,19 @@ export default function SummaryScreen() {
   const [cachedSummaries, setCachedSummaries] = useState<CachedSummary[]>([]);
   const [isFromCache, setIsFromCache] = useState(false);
 
-  // ── Pagination ──
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // ── Charger le cache au démarrage ──
   useEffect(() => {
+    trackView(); // ← AJOUT Phase 17
+
     const loadCache = async () => {
       try {
         const user = auth.currentUser;
         if (!user) return;
 
-        // 1. Cache local valide → utiliser
         const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
         if (raw) {
           const { data, timestamp } = JSON.parse(raw);
@@ -78,7 +79,6 @@ export default function SummaryScreen() {
           }
         }
 
-        // 2. Fallback Firestore
         const q = query(
           collection(db, "summaries"),
           where("userId", "==", user.uid),
@@ -112,7 +112,6 @@ export default function SummaryScreen() {
     loadCache();
   }, []);
 
-  // ── Charger plus depuis Firestore ──
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;
     const user = auth.currentUser;
@@ -148,7 +147,6 @@ export default function SummaryScreen() {
       setHasMore(snap.docs.length === PAGE_SIZE);
       setDisplayCount((prev) => prev + PAGE_SIZE);
 
-      // Mettre à jour le cache local
       await AsyncStorage.setItem(
         `${CACHE_KEY}_${user.uid}`,
         JSON.stringify({ data: updated.slice(0, MAX_CACHE_ITEMS), timestamp: Date.now() })
@@ -177,12 +175,14 @@ export default function SummaryScreen() {
     const cacheInput = { text: limitedText, language: currentLanguage };
     const cached = await readAICache("summary", cacheInput);
     if (cached) {
+      endTracking(true, true); // ← AJOUT Phase 17 — cache hit
       setSummary(cached.summary || "");
       setIsFromCache(true);
       setIsLoading(false);
       return;
     }
 
+    startTracking(); // ← AJOUT Phase 17
     setIsLoading(true);
     setSummary("");
     setIsSaved(false);
@@ -193,7 +193,9 @@ export default function SummaryScreen() {
       const data = res.data as any;
       setSummary(data.summary || "");
       await writeAICache("summary", cacheInput, data);
+      endTracking(true); // ← AJOUT Phase 17 — succès
     } catch (e: any) {
+      endTracking(false); // ← AJOUT Phase 17 — échec
       Alert.alert(t("error"), e.message || "La génération a échoué.");
     } finally {
       setIsLoading(false);
@@ -228,6 +230,8 @@ export default function SummaryScreen() {
         ...newEntry,
         createdAt: Timestamp.now(),
       });
+
+      trackConv("first_save"); // ← AJOUT Phase 17
 
       const updated = [newEntry, ...cachedSummaries].slice(0, MAX_CACHE_ITEMS);
       setCachedSummaries(updated);

@@ -1,5 +1,5 @@
 // app/solve.tsx
-import React, { useState, useEffect } from "react"; // ← useEffect ajouté
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -11,10 +11,10 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import {
   getFirestore, collection, getDocs, query, where,
   orderBy, limit, startAfter, QueryDocumentSnapshot,
-} from "firebase/firestore"; // ← AJOUT
+} from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SolveResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
@@ -23,13 +23,14 @@ import { useAIRequest } from "../hooks/useAIRequest";
 import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
+import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 
-const CACHE_KEY = "studyai_solutions"; // ← AJOUT
-const CACHE_TTL = 24 * 60 * 60 * 1000; // ← AJOUT
-const MAX_CACHE_ITEMS = 10;             // ← AJOUT
-const PAGE_SIZE = 5;                    // ← AJOUT
+const CACHE_KEY = "studyai_solutions";
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+const MAX_CACHE_ITEMS = 10;
+const PAGE_SIZE = 5;
 
-interface CachedSolution {              // ← AJOUT
+interface CachedSolution {
   id: string;
   userId: string;
   exercise: string;
@@ -42,13 +43,14 @@ interface CachedSolution {              // ← AJOUT
 export default function SolveScreen() {
   const app = getApp();
   const auth = getAuth(app);
-  const db = getFirestore(app); // ← AJOUT
+  const db = getFirestore(app);
   const functions = getFunctions(app, "us-central1");
   const { saveSolution, isLoading } = useAiStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { startTracking, endTracking, trackConv, trackView } = useAnalytics("solve"); // ← AJOUT Phase 17
 
   const [exercise, setExercise] = useState("");
   const [subject, setSubject] = useState("");
@@ -56,7 +58,6 @@ export default function SolveScreen() {
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // ── Historique ────────────────────────────────────────────────── ← AJOUT
   const [cachedSolutions, setCachedSolutions] = useState<CachedSolution[]>([]);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
@@ -64,6 +65,8 @@ export default function SolveScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
+    trackView(); // ← AJOUT Phase 17
+
     const loadCache = async () => {
       try {
         const user = auth.currentUser;
@@ -175,7 +178,6 @@ export default function SolveScreen() {
     });
     setSaved(true);
   };
-  // ────────────────────────────────────────────────────────────────
 
   const SUBJECTS =
     currentLanguage === "ar"
@@ -201,6 +203,7 @@ export default function SolveScreen() {
     const cacheInput = { exercise: limitedExercise, subject, language: currentLanguage };
     const cached = await readAICache("solve", cacheInput);
     if (cached) {
+      endTracking(true, true); // ← AJOUT Phase 17 — cache hit
       setResult({
         userId: auth.currentUser?.uid || "anonymous",
         exercise,
@@ -212,6 +215,7 @@ export default function SolveScreen() {
       return;
     }
 
+    startTracking(); // ← AJOUT Phase 17
     setGenerating(true);
     setResult(null);
     setSaved(false);
@@ -228,7 +232,9 @@ export default function SolveScreen() {
         createdAt: new Date().toISOString(),
       });
       await writeAICache("solve", cacheInput, data);
+      endTracking(true); // ← AJOUT Phase 17 — succès
     } catch (e: any) {
+      endTracking(false); // ← AJOUT Phase 17 — échec
       Alert.alert(t("error"), e.message || "La résolution a échoué.");
     } finally {
       setGenerating(false);
@@ -252,8 +258,8 @@ export default function SolveScreen() {
     try {
       await saveSolution(result);
       setSaved(true);
+      trackConv("first_save"); // ← AJOUT Phase 17
 
-      // ── Mettre à jour l'historique local ── ← AJOUT
       const newEntry: CachedSolution = {
         id: Date.now().toString(),
         userId: user.uid,
@@ -517,7 +523,7 @@ export default function SolveScreen() {
           </View>
         )}
 
-        {/* ── Historique solutions ── ← AJOUT */}
+        {/* Historique solutions */}
         {cachedSolutions.length > 0 && !result && (
           <View style={{ marginTop: 24 }}>
             <Text style={{
@@ -595,7 +601,6 @@ export default function SolveScreen() {
             )}
           </View>
         )}
-        {/* ── fin Historique ── */}
 
       </ScrollView>
     </SafeAreaView>
