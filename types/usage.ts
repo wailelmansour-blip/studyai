@@ -11,6 +11,6 @@ export interface UsageRecord {
 }
 
 export const LIMITS: Record<UserPlan, number> = {
-  free: 3,
+  free: 5,
   premium: 50,
 };
