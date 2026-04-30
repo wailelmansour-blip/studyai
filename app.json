@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.studyai.app"
+      "bundleIdentifier": "com.studyai.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -36,6 +39,14 @@
     "scheme": "studyai",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "cf39bf48-8bd2-46f5-b8e1-d3db75e562ce"
+      }
     }
   }
 }
