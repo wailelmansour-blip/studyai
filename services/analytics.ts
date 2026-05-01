@@ -84,33 +84,22 @@ export const trackAICall = async (
       createdAt: Timestamp.now(),
     };
 
-    // 1. Log détaillé dans ai_calls
+    // 1. Log détaillé
     await addDoc(collection(db, "analytics_ai_calls"), event);
 
-    // 2. Compteurs agrégés par jour
+    // 2. Compteurs agrégés — setDoc merge:true crée ou met à jour
     const dayRef = doc(db, "analytics_daily", `${user.uid}_${getToday()}`);
-    const daySnap = await getDoc(dayRef);
+    await setDoc(dayRef, {
+      userId: user.uid,
+      date: getToday(),
+      totalCalls: increment(1),
+      cachedCalls: fromCache ? increment(1) : increment(0),
+      failedCalls: !success ? increment(1) : increment(0),
+      screens: { [screen]: increment(1) },
+      createdAt: Timestamp.now(),
+    }, { merge: true });
 
-    if (daySnap.exists()) {
-      await updateDoc(dayRef, {
-        [`screens.${screen}`]: increment(1),
-        totalCalls: increment(1),
-        cachedCalls: fromCache ? increment(1) : increment(0),
-        failedCalls: !success ? increment(1) : increment(0),
-      });
-    } else {
-      await setDoc(dayRef, {
-        userId: user.uid,
-        date: getToday(),
-        totalCalls: 1,
-        cachedCalls: fromCache ? 1 : 0,
-        failedCalls: !success ? 1 : 0,
-        screens: { [screen]: 1 },
-        createdAt: Timestamp.now(),
-      });
-    }
   } catch (e) {
-    // Analytics silencieux — ne jamais bloquer l'UX
     console.log("Analytics trackAICall error:", e);
   }
 };

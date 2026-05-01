@@ -224,26 +224,28 @@ export default function HomeScreen() {
           flexDirection: "row", flexWrap: "wrap", gap: 12,
         }}>
           {FEATURES.map((feature) => (
-            <TouchableOpacity
-              key={feature.route}
-              onPress={() => router.push(feature.route as any)}
-              activeOpacity={0.85}
-              style={{
-                width: (width - 44) / 2,
-                borderRadius: 20, overflow: "hidden",
-                elevation: 4,
-                shadowColor: "#6366F1",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 8,
-              }}
-            >
-              <LinearGradient
-                colors={feature.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ padding: 20, minHeight: 130 }}
-              >
+            // APRÈS
+<TouchableOpacity
+  key={feature.route}
+  onPress={() => router.push(feature.route as any)}
+  activeOpacity={0.85}
+  style={{
+    width: (width - 44) / 2,
+    borderRadius: 20, overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#6366F1",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    height: 150, // ← hauteur FIXE identique pour toutes les cartes
+  }}
+>
+  <LinearGradient
+    colors={feature.gradient}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={{ flex: 1, padding: 20 }} // ← flex: 1 remplace minHeight
+  >
                 <Text style={{ fontSize: 32, marginBottom: 12 }}>
                   {feature.emoji}
                 </Text>
