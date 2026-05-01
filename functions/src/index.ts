@@ -9,6 +9,7 @@ import { generatePlan } from "./plan";
 import { chatAI } from "./chatAI";
 
 export { summarize, generateQuiz, generatePlan, chatAI };
+export { extractText } from "./extractText";
 
 const openaiKey = defineSecret("OPENAI_API_KEY");
 
