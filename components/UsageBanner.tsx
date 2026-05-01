@@ -14,6 +14,16 @@ export const UsageBanner: React.FC<Props> = ({ isRTL = false }) => {
   const { usage } = useUsageStore();
   const { currentLanguage } = useLanguageStore();
 
+  // ── calcul AVANT le return null ──
+  const isDone = usage
+    ? Math.max(0, LIMITS[usage.plan] - usage.count) === 0
+    : false;
+
+  // ── useEffect AVANT le return null ──
+  useEffect(() => {
+    if (isDone) trackConversion("limit_reached").catch(() => {});
+  }, [isDone]);
+
   if (!usage) return null;
 
   const limit = LIMITS[usage.plan];
@@ -21,11 +31,7 @@ export const UsageBanner: React.FC<Props> = ({ isRTL = false }) => {
   const percent = Math.min(100, (usage.count / limit) * 100);
   const isPremium = usage.plan === "premium";
   const isAlmostDone = remaining <= 1 && !isPremium;
-  const isDone = remaining === 0;
-
-  useEffect(() => {
-    if (isDone) trackConversion("limit_reached").catch(() => {});
-  }, [isDone]);
+  // isDone déjà calculé ci-dessus — pas de doublon
 
   const getLabel = () => {
     if (currentLanguage === "ar")
@@ -40,7 +46,6 @@ export const UsageBanner: React.FC<Props> = ({ isRTL = false }) => {
     : currentLanguage === "en" ? "Upgrade ✨"
     : "Premium ✨";
 
-  // Couleurs selon état
   const config = isDone
     ? { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B", bar: "#EF4444", icon: "warning" as any }
     : isAlmostDone

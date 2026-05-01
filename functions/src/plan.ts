@@ -48,17 +48,13 @@ export const generatePlan = onCall(
           role: "system",
           content: `Tu es un coach pédagogique expert. ${langInstruction}
 Crée un planning d'étude hebdomadaire structuré et motivant.
+Chaque session doit durer exactement ${hoursPerDay}h (${hoursPerDay * 60} minutes).
 Réponds UNIQUEMENT avec un JSON valide avec ce format :
 {
   "plan": "Description générale du plan",
   "schedule": {
-    "Lundi": [{"subject": "...", "duration": "1h", "task": "..."}],
-    "Mardi": [...],
-    "Mercredi": [...],
-    "Jeudi": [...],
-    "Vendredi": [...],
-    "Samedi": [...],
-    "Dimanche": [...]
+    "Lundi": [{"subject": "...", "duration": "${hoursPerDay}h", "task": "..."}],
+    ...
   },
   "tips": ["conseil 1", "conseil 2", "conseil 3"]
 }`,
