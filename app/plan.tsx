@@ -708,8 +708,12 @@ export default function PlanScreen() {
                     paddingHorizontal: 8, paddingVertical: 3,
                   }}>
                     <Text style={{ fontSize: 12, color: "#6366F1", fontWeight: "600" }}>
-                      {session.duration} min
-                    </Text>
+  {session.duration % 60 === 0
+    ? `${session.duration / 60}h`
+    : session.duration > 60
+    ? `${Math.floor(session.duration / 60)}h${String(session.duration % 60).padStart(2, "0")}`
+    : `${session.duration} min`}
+</Text>
                   </View>
                 </View>
                 <Text style={{
