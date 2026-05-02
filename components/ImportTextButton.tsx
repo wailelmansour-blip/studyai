@@ -193,10 +193,10 @@ export const ImportTextButton: React.FC<Props> = ({
                   {getLabel("pdf")}
                 </Text>
                 <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
-                  {currentLanguage === "ar" ? "مجاني · يدعم جميع ملفات PDF"
-                    : currentLanguage === "en" ? "Free · Supports all PDF files"
-                    : "Gratuit · Supporte tous les PDFs"}
-                </Text>
+  {currentLanguage === "ar" ? "يدعم جميع ملفات PDF"
+    : currentLanguage === "en" ? "Supports all PDF files"
+    : "Supporte tous les PDFs"}
+</Text>
               </View>
               <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color="#6366F1" />
             </TouchableOpacity>
@@ -221,10 +221,10 @@ export const ImportTextButton: React.FC<Props> = ({
                   {getLabel("image")}
                 </Text>
                 <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
-                  {currentLanguage === "ar" ? "ذكاء اصطناعي · ~$0.0002 لكل صورة"
-                    : currentLanguage === "en" ? "AI Vision · ~$0.0002 per image"
-                    : "Vision IA · ~$0.0002 par image"}
-                </Text>
+  {currentLanguage === "ar" ? "يدعم جميع أنواع الصور"
+    : currentLanguage === "en" ? "Supports all image types"
+    : "Supporte tous les types d'images"}
+</Text>
               </View>
               <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color="#10B981" />
             </TouchableOpacity>
