@@ -23,6 +23,7 @@ import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { ImportTextButton } from "../components/ImportTextButton"; // ← AJOUT
 
 const CACHE_KEY = "studyai_summaries";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -331,7 +332,12 @@ export default function SummaryScreen() {
         }}>
           📝 {t("text_to_summarize")}
         </Text>
-
+{/* Import PDF / Image */}
+<ImportTextButton
+  onTextExtracted={(text) => setInputText(text)}
+  currentLanguage={currentLanguage}
+  isRTL={isRTL}
+/>
         {/* Input */}
         <TextInput
           value={inputText}

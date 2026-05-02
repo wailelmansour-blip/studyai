@@ -19,23 +19,24 @@ export const extractText = onCall(
     }
 
     // ── PDF ──────────────────────────────────────────────────────
-    if (type === "pdf") {
-      try {
-        // import dynamique pour éviter l'erreur ESM/CJS
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require("pdf-parse");
-        const buffer = Buffer.from(base64, "base64");
-        const parsed = await pdfParse(buffer);
-        const text = (parsed.text as string)?.trim();
-        if (!text || text.length < 10) {
-          throw new HttpsError("internal", "PDF vide ou non lisible.");
-        }
-        return { text: text.slice(0, 8000) };
-      } catch (e: any) {
-        if (e instanceof HttpsError) throw e;
-        throw new HttpsError("internal", "Erreur lecture PDF: " + (e?.message || "inconnue"));
-      }
+if (type === "pdf") {
+  try {
+    // Import compatible toutes versions de pdf-parse
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParseModule = require("pdf-parse");
+    const pdfParse = pdfParseModule.default || pdfParseModule;
+    const buffer = Buffer.from(base64, "base64");
+    const parsed = await pdfParse(buffer);
+    const text = (parsed.text as string)?.trim();
+    if (!text || text.length < 10) {
+      throw new HttpsError("internal", "PDF vide ou non lisible.");
     }
+    return { text: text.slice(0, 8000) };
+  } catch (e: any) {
+    if (e instanceof HttpsError) throw e;
+    throw new HttpsError("internal", "Erreur lecture PDF: " + (e?.message || "inconnue"));
+  }
+}
 
     // ── IMAGE → OpenAI Vision ────────────────────────────────────
     if (type === "image") {
