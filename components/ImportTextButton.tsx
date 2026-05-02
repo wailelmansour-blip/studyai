@@ -68,8 +68,8 @@ export const ImportTextButton: React.FC<Props> = ({
         Alert.alert("✅", getLabel("success"));
       }
     } catch (e: any) {
-      Alert.alert("Erreur", getLabel("error_pdf"));
-      console.error("PDF extract error:", e);
+  console.error("PDF extract error detail:", e?.message, e?.code); // ← AJOUT
+  Alert.alert("Erreur", getLabel("error_pdf"));
     } finally {
       setLoading(false);
     }
@@ -112,8 +112,8 @@ export const ImportTextButton: React.FC<Props> = ({
         Alert.alert("✅", getLabel("success"));
       }
     } catch (e: any) {
-      Alert.alert("Erreur", getLabel("error_image"));
-      console.error("Image extract error:", e);
+  console.error("Image extract error detail:", e?.message, e?.code); // ← AJOUT
+  Alert.alert("Erreur", getLabel("error_image"));
     } finally {
       setLoading(false);
     }
