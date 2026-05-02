@@ -24,6 +24,7 @@ import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { ImportTextButton } from "../components/ImportTextButton";
 
 const CACHE_KEY = "studyai_explanations";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -338,6 +339,17 @@ export default function ExplainScreen() {
         }}>
           📝 {t("text_to_explain")}
         </Text>
+
+        <ImportTextButton
+  onTextExtracted={(text) => {
+    setText(text);
+    setResult(null);
+    setSaved(false);
+  }}
+  currentLanguage={currentLanguage}
+  isRTL={isRTL}
+/>
+
         <TextInput
           value={text}
           onChangeText={setText}

@@ -24,6 +24,7 @@ import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { ImportTextButton } from "../components/ImportTextButton";
 
 const CACHE_KEY = "studyai_solutions";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -367,6 +368,17 @@ export default function SolveScreen() {
         }}>
           ✏️ {t("exercise_input")}
         </Text>
+
+<ImportTextButton
+  onTextExtracted={(text) => {
+    setExercise(text);
+    setResult(null);
+    setSaved(false);
+  }}
+  currentLanguage={currentLanguage}
+  isRTL={isRTL}
+/>
+
         <TextInput
           value={exercise}
           onChangeText={setExercise}

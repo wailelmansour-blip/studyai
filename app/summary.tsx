@@ -332,9 +332,14 @@ export default function SummaryScreen() {
         }}>
           📝 {t("text_to_summarize")}
         </Text>
-{/* Import PDF / Image */}
+{/* ── Import PDF / Image ── */}
 <ImportTextButton
-  onTextExtracted={(text) => setInputText(text)}
+  onTextExtracted={(text) => {
+    setInputText(text);
+    setSummary("");
+    setIsSaved(false);
+    setIsFromCache(false);
+  }}
   currentLanguage={currentLanguage}
   isRTL={isRTL}
 />
