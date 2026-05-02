@@ -18,63 +18,54 @@ export const extractText = onCall(
       throw new HttpsError("invalid-argument", "type et base64 requis.");
     }
 
-    // ── PDF ──────────────────────────────────────────────────────
-if (type === "pdf") {
-  try {
-    // Import compatible toutes versions de pdf-parse
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParseModule = require("pdf-parse");
-    const pdfParse = pdfParseModule.default || pdfParseModule;
-    const buffer = Buffer.from(base64, "base64");
-    const parsed = await pdfParse(buffer);
-    const text = (parsed.text as string)?.trim();
-    if (!text || text.length < 10) {
-      throw new HttpsError("internal", "PDF vide ou non lisible.");
-    }
-    return { text: text.slice(0, 8000) };
-  } catch (e: any) {
-    if (e instanceof HttpsError) throw e;
-    throw new HttpsError("internal", "Erreur lecture PDF: " + (e?.message || "inconnue"));
-  }
-}
+    // ── PDF ou IMAGE → OpenAI Vision ─────────────────────────────
+    // On utilise OpenAI Vision pour les deux types
+    // PDF envoyé comme image (première page) ou image directement
+    try {
+      const openai = new OpenAI({ apiKey: openaiKey.value() });
 
-    // ── IMAGE → OpenAI Vision ────────────────────────────────────
-    if (type === "image") {
-      try {
-        const openai = new OpenAI({ apiKey: openaiKey.value() });
-        const dataUrl = `data:${mimeType || "image/jpeg"};base64,${base64}`;
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          max_tokens: 2000,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "image_url",
-                  image_url: { url: dataUrl, detail: "high" },
-                },
-                {
-                  type: "text",
-                  text: "Extrais tout le texte visible dans cette image. Retourne uniquement le texte extrait, sans commentaire ni formatage supplémentaire.",
-                },
-              ],
-            },
-          ],
-        });
-
-        const text = response.choices[0]?.message?.content?.trim();
-        if (!text || text.length < 5) {
-          throw new HttpsError("internal", "Aucun texte détecté dans l'image.");
-        }
-        return { text: text.slice(0, 8000) };
-      } catch (e: any) {
-        if (e instanceof HttpsError) throw e;
-        throw new HttpsError("internal", "Erreur OCR image: " + (e?.message || "inconnue"));
+      // Déterminer le mimeType correct
+      let imageMimeType = "image/jpeg";
+      if (type === "pdf") {
+        imageMimeType = "application/pdf";
+      } else if (mimeType) {
+        imageMimeType = mimeType;
       }
-    }
 
-    throw new HttpsError("invalid-argument", "type doit être 'pdf' ou 'image'.");
+      const dataUrl = `data:${imageMimeType};base64,${base64}`;
+
+      const prompt = type === "pdf"
+        ? "Ce fichier est un PDF. Extrais tout le texte visible. Retourne uniquement le texte extrait, sans commentaire ni formatage supplémentaire."
+        : "Extrais tout le texte visible dans cette image. Retourne uniquement le texte extrait, sans commentaire ni formatage supplémentaire.";
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 3000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: { url: dataUrl, detail: "high" },
+              },
+              {
+                type: "text",
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      });
+
+      const text = response.choices[0]?.message?.content?.trim();
+      if (!text || text.length < 5) {
+        throw new HttpsError("internal", "Aucun texte détecté.");
+      }
+      return { text: text.slice(0, 8000) };
+    } catch (e: any) {
+      if (e instanceof HttpsError) throw e;
+      throw new HttpsError("internal", "Erreur extraction: " + (e?.message || "inconnue"));
+    }
   }
 );
