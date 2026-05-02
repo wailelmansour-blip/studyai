@@ -1,5 +1,5 @@
 // app/quiz.tsx
-import React, { useState, useEffect } from "react"; // ← useEffect ajouté
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -8,15 +8,26 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import {
+  getFirestore, collection, addDoc, Timestamp,
+  getDocs, query, where, orderBy, limit, startAfter,
+  QueryDocumentSnapshot,
+} from "firebase/firestore"; // ← AJOUT
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 import { useAIRequest } from "../hooks/useAIRequest";
 import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
-import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { useAnalytics } from "../hooks/useAnalytics";
+
+const CACHE_KEY = "studyai_quizzes"; // ← AJOUT
+const CACHE_TTL = 24 * 60 * 60 * 1000; // ← AJOUT
+const MAX_CACHE_ITEMS = 10; // ← AJOUT
+const PAGE_SIZE = 5; // ← AJOUT
 
 interface QuizQuestion {
   question: string;
@@ -25,15 +36,26 @@ interface QuizQuestion {
   explanation: string;
 }
 
+interface CachedQuiz { // ← AJOUT
+  id: string;
+  userId: string;
+  topic: string;
+  score: number;
+  total: number;
+  questions: QuizQuestion[];
+  createdAt: string;
+}
+
 export default function QuizScreen() {
   const app = getApp();
   const auth = getAuth(app);
+  const db = getFirestore(app); // ← AJOUT
   const functions = getFunctions(app, "us-central1");
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
-  const { startTracking, endTracking, trackView } = useAnalytics("quiz"); // ← AJOUT Phase 17
+  const { startTracking, endTracking, trackView } = useAnalytics("quiz");
 
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState("5");
@@ -45,9 +67,161 @@ export default function QuizScreen() {
   const [generating, setGenerating] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
 
+  // ── Historique ────────────────────────────────────────────────── ← AJOUT
+  const [cachedQuizzes, setCachedQuizzes] = useState<CachedQuiz[]>([]);
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   useEffect(() => {
-    trackView(); // ← AJOUT Phase 17
+    trackView();
+
+    // ── Charger historique ── ← AJOUT
+    const loadCache = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data, timestamp } = JSON.parse(raw);
+          if (Date.now() - timestamp < CACHE_TTL && data?.length > 0) {
+            setCachedQuizzes(data);
+            setHasMore(data.length >= PAGE_SIZE);
+            return;
+          }
+        }
+
+        const q = query(
+          collection(db, "quizzes"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+
+        const fromFirestore: CachedQuiz[] = snap.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          topic: doc.data().topic || "",
+          score: doc.data().score || 0,
+          total: doc.data().total || 0,
+          questions: doc.data().questions || [],
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedQuizzes(fromFirestore);
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Quiz cache load error:", e);
+      }
+    };
+    loadCache();
   }, []);
+
+  // ── Charger plus ── ← AJOUT
+  const handleLoadMore = async () => {
+    if (!lastDoc || loadingMore) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, "quizzes"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) { setHasMore(false); return; }
+
+      const more: CachedQuiz[] = snap.docs.map((doc) => ({
+        id: doc.id,
+        userId: doc.data().userId,
+        topic: doc.data().topic || "",
+        score: doc.data().score || 0,
+        total: doc.data().total || 0,
+        questions: doc.data().questions || [],
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      }));
+
+      const updated = [...cachedQuizzes, ...more];
+      setCachedQuizzes(updated);
+      setLastDoc(snap.docs[snap.docs.length - 1]);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setDisplayCount((prev) => prev + PAGE_SIZE);
+
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updated.slice(0, MAX_CACHE_ITEMS), timestamp: Date.now() })
+      );
+    } catch (e) {
+      console.log("Load more quizzes error:", e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // ── Sauvegarder résultat automatiquement ── ← AJOUT
+  const handleSaveResult = async (finalScore: number) => {
+    const user = auth.currentUser;
+    if (!user || questions.length === 0) return;
+
+    try {
+      const newEntry: CachedQuiz = {
+        id: Date.now().toString(),
+        userId: user.uid,
+        topic,
+        score: finalScore,
+        total: questions.length,
+        questions,
+        createdAt: new Date().toISOString(),
+      };
+
+      await addDoc(collection(db, "quizzes"), {
+        ...newEntry,
+        createdAt: Timestamp.now(),
+      });
+
+      const updated = [newEntry, ...cachedQuizzes].slice(0, MAX_CACHE_ITEMS);
+      setCachedQuizzes(updated);
+      setHasMore(updated.length >= PAGE_SIZE);
+
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updated, timestamp: Date.now() })
+      );
+    } catch (e) {
+      console.log("Quiz save error:", e);
+    }
+  };
+
+  // ── Rejouer un quiz depuis l'historique ── ← AJOUT
+  const handleReplay = (item: CachedQuiz) => {
+    setTopic(item.topic);
+    setQuestions(item.questions);
+    setCurrentIndex(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowAnswer(false);
+    setPhase("playing");
+  };
+
+  const getMoreLabel = () => {
+    if (currentLanguage === "ar") return "عرض المزيد";
+    if (currentLanguage === "en") return "Show more";
+    return "Voir plus";
+  };
 
   const resultMessage = () => {
     if (score >= questions.length * 0.8) {
@@ -84,7 +258,7 @@ export default function QuizScreen() {
     const cacheInput = { topic: limitedTopic, count, language: currentLanguage };
     const cached = await readAICache("quiz", cacheInput);
     if (cached?.questions?.length > 0) {
-      endTracking(true, true); // ← AJOUT Phase 17 — cache hit
+      endTracking(true, true);
       setQuestions(cached.questions);
       setCurrentIndex(0);
       setScore(0);
@@ -94,7 +268,7 @@ export default function QuizScreen() {
       return;
     }
 
-    startTracking(); // ← AJOUT Phase 17
+    startTracking();
     setGenerating(true);
     try {
       const fn = httpsCallable(functions, "generateQuiz");
@@ -109,9 +283,9 @@ export default function QuizScreen() {
       setShowAnswer(false);
       setPhase("playing");
       await writeAICache("quiz", cacheInput, data);
-      endTracking(true); // ← AJOUT Phase 17 — succès
+      endTracking(true);
     } catch (e: any) {
-      endTracking(false); // ← AJOUT Phase 17 — échec
+      endTracking(false);
       Alert.alert(t("error"), e.message || "Génération échouée.");
     } finally {
       setGenerating(false);
@@ -133,7 +307,9 @@ export default function QuizScreen() {
       setSelectedAnswer(null);
       setShowAnswer(false);
     } else {
+      const finalScore = score + (selectedAnswer === questions[currentIndex].correct ? 0 : 0);
       setPhase("result");
+      handleSaveResult(score); // ← AJOUT — sauvegarde automatique
     }
   };
 
@@ -258,6 +434,106 @@ export default function QuizScreen() {
                 </View>
               )}
             </TouchableOpacity>
+
+            {/* ── Historique quizzes ── ← AJOUT */}
+            {cachedQuizzes.length > 0 && (
+              <View style={{ marginTop: 28 }}>
+                <Text style={{
+                  fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
+                  textAlign: isRTL ? "right" : "left",
+                }}>
+                  🕒 {currentLanguage === "ar" ? "الاختبارات السابقة"
+                    : currentLanguage === "en" ? "Previous Quizzes"
+                    : "Quiz précédents"}
+                </Text>
+                {cachedQuizzes.slice(0, displayCount).map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => handleReplay(item)}
+                    style={{
+                      backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
+                      marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB",
+                      elevation: 1,
+                    }}
+                  >
+                    <View style={{
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                      justifyContent: "space-between", alignItems: "center",
+                    }}>
+                      <Text style={{
+                        fontSize: 13, fontWeight: "600", color: "#374151", flex: 1,
+                        textAlign: isRTL ? "right" : "left",
+                      }}
+                        numberOfLines={1}
+                      >
+                        🧠 {item.topic}
+                      </Text>
+                      {/* Score badge */}
+                      <View style={{
+                        backgroundColor: item.score >= item.total * 0.8 ? "#F0FDF4"
+                          : item.score >= item.total * 0.5 ? "#FFFBEB" : "#FEF2F2",
+                        borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
+                        marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0,
+                      }}>
+                        <Text style={{
+                          fontSize: 12, fontWeight: "700",
+                          color: item.score >= item.total * 0.8 ? "#065F46"
+                            : item.score >= item.total * 0.5 ? "#92400E" : "#991B1B",
+                        }}>
+                          {item.score}/{item.total}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                      justifyContent: "space-between", alignItems: "center", marginTop: 6,
+                    }}>
+                      <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                        {new Date(item.createdAt).toLocaleDateString(
+                          currentLanguage === "ar" ? "ar-SA"
+                          : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                        )}
+                      </Text>
+                      <View style={{
+                        flexDirection: isRTL ? "row-reverse" : "row",
+                        alignItems: "center", gap: 4,
+                      }}>
+                        <Ionicons name="refresh-outline" size={12} color="#6366F1" />
+                        <Text style={{ fontSize: 11, color: "#6366F1", fontWeight: "600" }}>
+                          {currentLanguage === "ar" ? "إعادة"
+                            : currentLanguage === "en" ? "Replay"
+                            : "Rejouer"}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+
+                {hasMore && (
+                  <TouchableOpacity
+                    onPress={handleLoadMore}
+                    disabled={loadingMore}
+                    style={{
+                      borderRadius: 12, padding: 14, alignItems: "center",
+                      backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+                      marginTop: 4,
+                    }}
+                  >
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color="#6366F1" />
+                    ) : (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Ionicons name="chevron-down" size={16} color="#6366F1" />
+                        <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 14 }}>
+                          {getMoreLabel()}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+            {/* ── fin Historique ── */}
           </View>
         )}
 
@@ -394,21 +670,61 @@ export default function QuizScreen() {
               {score}/{questions.length}
             </Text>
             <Text style={{
-              fontSize: 15, color: "#6B7280", marginBottom: 32, textAlign: "center",
+              fontSize: 15, color: "#6B7280", marginBottom: 12, textAlign: "center",
             }}>
               {resultMessage()}
             </Text>
-            <TouchableOpacity
-              onPress={handleReset}
-              style={{
-                backgroundColor: "#6366F1", borderRadius: 14, padding: 16,
-                alignItems: "center", width: "100%",
-              }}
-            >
-              <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
-                🔄 {t("new_quiz")}
+
+            {/* Badge sauvegardé automatiquement ← AJOUT */}
+            <View style={{
+              backgroundColor: "#F0FDF4", borderRadius: 8, padding: 8,
+              flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 24,
+            }}>
+              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              <Text style={{ fontSize: 12, color: "#065F46" }}>
+                {currentLanguage === "ar" ? "تم حفظ النتيجة تلقائياً"
+                  : currentLanguage === "en" ? "Result saved automatically"
+                  : "Résultat sauvegardé automatiquement"}
               </Text>
-            </TouchableOpacity>
+            </View>
+
+            {/* Boutons result ← AJOUT bouton Rejouer */}
+            <View style={{ width: "100%", gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  // Rejouer le même quiz
+                  setCurrentIndex(0);
+                  setScore(0);
+                  setSelectedAnswer(null);
+                  setShowAnswer(false);
+                  setPhase("playing");
+                }}
+                style={{
+                  backgroundColor: "#EEF2FF", borderRadius: 14, padding: 16,
+                  alignItems: "center", width: "100%",
+                  flexDirection: "row", justifyContent: "center", gap: 8,
+                }}
+              >
+                <Ionicons name="refresh-outline" size={18} color="#6366F1" />
+                <Text style={{ color: "#6366F1", fontWeight: "700", fontSize: 16 }}>
+                  {currentLanguage === "ar" ? "إعادة المحاولة"
+                    : currentLanguage === "en" ? "Try again"
+                    : "Réessayer"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleReset}
+                style={{
+                  backgroundColor: "#6366F1", borderRadius: 14, padding: 16,
+                  alignItems: "center", width: "100%",
+                }}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
+                  🔄 {t("new_quiz")}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>

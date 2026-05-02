@@ -28,7 +28,7 @@ export const ImportTextButton: React.FC<Props> = ({
 
   const getLabel = (key: string) => {
     const labels: Record<string, Record<string, string>> = {
-      import: { fr: "📎 Importer", en: "📎 Import", ar: "📎 استيراد" },
+      import: { fr: " Importer", en: " Import", ar: " استيراد" },//📎
       pdf: { fr: "📄 Depuis un PDF", en: "📄 From a PDF", ar: "📄 من ملف PDF" },
       image: { fr: "🖼️ Depuis une image", en: "🖼️ From an image", ar: "🖼️ من صورة" },
       cancel: { fr: "Annuler", en: "Cancel", ar: "إلغاء" },
