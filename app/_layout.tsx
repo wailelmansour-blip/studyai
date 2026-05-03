@@ -41,7 +41,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      router.push("/(tabs)/planning");
+      router.push("/plan");
     });
     return () => sub.remove();
   }, []);
