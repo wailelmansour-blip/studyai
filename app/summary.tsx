@@ -66,50 +66,52 @@ export default function SummaryScreen() {
     trackView(); // ← AJOUT Phase 17
 
     const loadCache = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
 
-        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
-        if (raw) {
-          const { data, timestamp } = JSON.parse(raw);
-          if (Date.now() - timestamp < CACHE_TTL && data?.length > 0) {
-            setCachedSummaries(data);
-            setHasMore(data.length >= PAGE_SIZE);
-            return;
-          }
-        }
-
-        const q = query(
-          collection(db, "summaries"),
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc"),
-          limit(PAGE_SIZE)
-        );
-        const snap = await getDocs(q);
-        if (snap.empty) return;
-
-        const fromFirestore: CachedSummary[] = snap.docs.map((doc) => ({
-          id: doc.id,
-          userId: doc.data().userId,
-          originalText: doc.data().originalText,
-          summary: doc.data().summary,
-          language: doc.data().language || "fr",
-          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-        }));
-
-        setCachedSummaries(fromFirestore);
-        setLastDoc(snap.docs[snap.docs.length - 1]);
-        setHasMore(snap.docs.length === PAGE_SIZE);
-
-        await AsyncStorage.setItem(
-          `${CACHE_KEY}_${user.uid}`,
-          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
-        );
-      } catch (e) {
-        console.log("Cache load error:", e);
+    // 1. Afficher le cache local immédiatement (UX rapide)
+    const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+    if (raw) {
+      const { data } = JSON.parse(raw);
+      if (data?.length > 0) {
+        setCachedSummaries(data);
+        setHasMore(data.length >= PAGE_SIZE);
       }
-    };
+    }
+
+    // 2. Toujours charger Firestore pour avoir les données à jour
+    const q = query(
+      collection(db, "summaries"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(PAGE_SIZE)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return;
+
+    const fromFirestore: CachedSummary[] = snap.docs.map((doc) => ({
+      id: doc.id,
+      userId: doc.data().userId,
+      originalText: doc.data().originalText,
+      summary: doc.data().summary,
+      language: doc.data().language || "fr",
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+    }));
+
+    // 3. Mettre à jour UI + cache avec données Firestore
+    setCachedSummaries(fromFirestore);
+    setLastDoc(snap.docs[snap.docs.length - 1]);
+    setHasMore(snap.docs.length === PAGE_SIZE);
+
+    await AsyncStorage.setItem(
+      `${CACHE_KEY}_${user.uid}`,
+      JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+    );
+  } catch (e) {
+    console.log("Cache load error:", e);
+  }
+};
     loadCache();
   }, []);
 
