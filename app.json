@@ -7,6 +7,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "enabled": false
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -47,7 +50,6 @@
       "eas": {
         "projectId": "083a59db-2663-442d-bc88-a53cbdb2360c"
       }
-    },
-    "owner": "mindforgesstudio"
+    }
   }
 }
