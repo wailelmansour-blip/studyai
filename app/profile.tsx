@@ -7,12 +7,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/store/authStore";
-import { useLanguageStore, LANGUAGES, Language } from "../../store/languageStore";
+import { useLanguageStore, LANGUAGES, Language } from "@/store/languageStore";
 import { useTranslation } from "react-i18next";
-import { useNotificationStore } from "../../store/notificationStore"; // ← AJOUT Phase 16
-import { sendTestNotification } from "../../services/notifications";   // ← AJOUT Phase 16
+import { useNotificationStore } from "@/store/notificationStore"; // ← AJOUT Phase 16
+import { sendTestNotification } from "@/services/notifications";   // ← AJOUT Phase 16
 import DateTimePicker from "@react-native-community/datetimepicker";   // ← AJOUT Phase 16
-import { useDeleteHistory, HistoryType } from "../../hooks/useDeleteHistory";
+import { useDeleteHistory, HistoryType } from "@/hooks/useDeleteHistory";
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -20,7 +20,7 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const [showLangModal, setShowLangModal] = useState(false);
   const [changingLang, setChangingLang] = useState(false);
-
+const { confirmDeleteAll } = useDeleteHistory();
   // ── Phase 16 ──
   const {
     settings, hasPermission, loadSettings,
@@ -37,8 +37,7 @@ export default function ProfileScreen() {
   }, []);
   // ── fin Phase 16 ──
 
-  const { confirmDeleteAll } = useDeleteHistory();
-  const { currentLanguage: lang } = useLanguageStore();
+  
 
   const displayName = user?.email?.split("@")[0] || "Étudiant";
   const currentLang = LANGUAGES.find((l) => l.code === currentLanguage);

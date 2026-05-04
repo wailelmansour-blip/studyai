@@ -93,6 +93,7 @@ export default function ChatScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const { startTracking, endTracking, trackView } = useAnalytics("chat"); // ← AJOUT Phase 17
 
   const COURSES =
@@ -101,7 +102,7 @@ export default function ChatScreen() {
     : COURSES_FR;
 
   const db = getFirestore(app);
-  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
+  
 
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [message, setMessage] = useState("");

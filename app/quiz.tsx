@@ -56,6 +56,7 @@ export default function QuizScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const { startTracking, endTracking, trackView } = useAnalytics("quiz");
 
   const [topic, setTopic] = useState("");

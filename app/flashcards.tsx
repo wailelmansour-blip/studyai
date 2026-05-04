@@ -49,6 +49,7 @@ export default function FlashcardsScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("flashcards"); // ← AJOUT Phase 17
 
   const [topic, setTopic] = useState("");

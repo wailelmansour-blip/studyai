@@ -52,6 +52,7 @@ export default function ExplainScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("explain"); // ← AJOUT Phase 17
 
   const [text, setText] = useState("");

@@ -52,6 +52,7 @@ export default function SolveScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("solve"); // ← AJOUT Phase 17
 
   const [exercise, setExercise] = useState("");

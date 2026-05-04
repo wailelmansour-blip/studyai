@@ -55,6 +55,7 @@ export default function PlanScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("plan"); // ← AJOUT Phase 17
 
   const [subjects, setSubjects] = useState<string[]>([""]);
