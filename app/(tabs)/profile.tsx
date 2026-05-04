@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
-  Alert, Modal, Switch, Platform,
+  Alert, Modal, Switch, Platform,ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +14,8 @@ import { sendTestNotification } from "../../services/notifications";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useDeleteHistory, HistoryType } from "../../hooks/useDeleteHistory";
 import { useHistoryStore } from "../../store/historyStore";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { getApp } from "firebase/app";
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -22,6 +24,54 @@ export default function ProfileScreen() {
   const [showLangModal, setShowLangModal] = useState(false);
   const [changingLang, setChangingLang] = useState(false);
   const { confirmDeleteAll } = useDeleteHistory();
+
+const functions = getFunctions(getApp(), "us-central1");
+const [deletingAccount, setDeletingAccount] = useState(false);
+
+const handleDeleteAccount = () => {
+  Alert.alert(
+    currentLanguage === "ar" ? "حذف الحساب" 
+      : currentLanguage === "en" ? "Delete Account" 
+      : "Supprimer le compte",
+    currentLanguage === "ar" 
+      ? "هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً."
+      : currentLanguage === "en"
+      ? "This action cannot be undone. All your data will be permanently deleted."
+      : "Cette action est irréversible. Toutes vos données seront définitivement supprimées.",
+    [
+      { 
+        text: currentLanguage === "ar" ? "إلغاء" : currentLanguage === "en" ? "Cancel" : "Annuler",
+        style: "cancel" 
+      },
+      {
+        text: currentLanguage === "ar" ? "حذف نهائياً" : currentLanguage === "en" ? "Delete permanently" : "Supprimer définitivement",
+        style: "destructive",
+        onPress: confirmDeleteAccount,
+      },
+    ]
+  );
+};
+
+const confirmDeleteAccount = async () => {
+  setDeletingAccount(true);
+  try {
+    const fn = httpsCallable(functions, "deleteAccount");
+    await fn({});
+    await logout();
+  } catch (e: any) {
+    Alert.alert(
+      currentLanguage === "ar" ? "خطأ" : currentLanguage === "en" ? "Error" : "Erreur",
+      e.message || (
+        currentLanguage === "ar" ? "فشل حذف الحساب"
+        : currentLanguage === "en" ? "Failed to delete account"
+        : "Échec de la suppression du compte"
+      )
+    );
+  } finally {
+    setDeletingAccount(false);
+  }
+};
+
   const { triggerRefresh } = useHistoryStore();
 
 
@@ -388,6 +438,32 @@ export default function ProfileScreen() {
             {t("logout")}
           </Text>
         </TouchableOpacity>
+
+          {/* ── Suppression compte ── */}
+<TouchableOpacity
+  onPress={handleDeleteAccount}
+  disabled={deletingAccount}
+  style={{
+    borderRadius: 14, padding: 16, marginTop: 12,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "#FECACA",
+    opacity: deletingAccount ? 0.6 : 1,
+  }}
+>
+  {deletingAccount ? (
+    <ActivityIndicator size="small" color="#EF4444" />
+  ) : (
+    <>
+      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+      <Text style={{ fontSize: 14, fontWeight: "600", color: "#EF4444", marginLeft: 8 }}>
+        {currentLanguage === "ar" ? "حذف الحساب نهائياً"
+          : currentLanguage === "en" ? "Delete my account"
+          : "Supprimer mon compte"}
+      </Text>
+    </>
+  )}
+</TouchableOpacity>
+
       </ScrollView>
 
       {showTimePicker && (

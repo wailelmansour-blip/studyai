@@ -1,4 +1,7 @@
 // functions/src/index.ts
+import * as admin from "firebase-admin";
+
+admin.initializeApp(); // ← AJOUTER ICI
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import OpenAI from "openai";
@@ -10,7 +13,7 @@ import { chatAI } from "./chatAI";
 
 export { summarize, generateQuiz, generatePlan, chatAI };
 export { extractText } from "./extractText";
-
+export { deleteAccount } from "./deleteAccount";
 const openaiKey = defineSecret("OPENAI_API_KEY");
 
 // ── explainText ───────────────────────────────────────────
