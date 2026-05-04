@@ -10,12 +10,28 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
 
+const getPasswordStrength = (pwd: string): { label: string; color: string; score: number } => {
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+  if (score <= 1) return { label: "Faible", color: "#EF4444", score };
+  if (score === 2) return { label: "Moyen", color: "#F59E0B", score };
+  if (score === 3) return { label: "Bien", color: "#10B981", score };
+  return { label: "Fort", color: "#6366F1", score };
+};
+
 export default function SignupScreen() {
   const { signup, isLoading, error, clearError } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+
+  const strength = getPasswordStrength(password);
 
   const handleSignup = async () => {
     if (!email.trim() || !password.trim()) {
@@ -33,10 +49,65 @@ export default function SignupScreen() {
     clearError();
     try {
       await signup(email.trim(), password);
-    } catch {
-      Alert.alert("Inscription échouée", error || "Réessaie.");
+      setEmailSent(true);
+    } catch (e: any) {
+      if (e.code === "auth/email-already-in-use") {
+        Alert.alert("Compte existant", "Un compte existe déjà avec cet email. Connecte-toi.");
+      } else {
+        Alert.alert("Inscription échouée", error || e.message || "Réessaie.");
+      }
     }
   };
+
+  // ── Écran confirmation email envoyé ──
+  if (emailSent) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center" }}>
+          <View style={{ alignItems: "center", marginBottom: 32 }}>
+            <View style={{
+              width: 80, height: 80, borderRadius: 40,
+              backgroundColor: "#EEF2FF", alignItems: "center",
+              justifyContent: "center", marginBottom: 20,
+            }}>
+              <Ionicons name="mail-outline" size={40} color="#6366F1" />
+            </View>
+            <Text style={{ fontSize: 24, fontWeight: "700", color: "#111827", textAlign: "center" }}>
+              Vérifie ton email
+            </Text>
+            <Text style={{ fontSize: 15, color: "#6B7280", marginTop: 12, textAlign: "center", lineHeight: 22 }}>
+              Un email de vérification a été envoyé à{"\n"}
+              <Text style={{ fontWeight: "600", color: "#374151" }}>{email}</Text>
+            </Text>
+            <Text style={{ fontSize: 14, color: "#9CA3AF", marginTop: 16, textAlign: "center", lineHeight: 20 }}>
+              Clique sur le lien dans l'email pour activer ton compte, puis connecte-toi.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => router.replace("/(auth)/login")}
+            style={{
+              backgroundColor: "#6366F1", borderRadius: 14,
+              padding: 16, alignItems: "center", marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
+              Aller à la connexion
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ alignItems: "center", padding: 8 }}
+          >
+            <Text style={{ fontSize: 14, color: "#6B7280" }}>
+              Retour
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
@@ -64,6 +135,7 @@ export default function SignupScreen() {
             </Text>
           </View>
 
+          {/* Email */}
           <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
             Email
           </Text>
@@ -81,10 +153,11 @@ export default function SignupScreen() {
             }}
           />
 
+          {/* Mot de passe */}
           <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
             Mot de passe
           </Text>
-          <View style={{ position: "relative", marginBottom: 16 }}>
+          <View style={{ position: "relative", marginBottom: 8 }}>
             <TextInput
               value={password}
               onChangeText={setPassword}
@@ -108,6 +181,27 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Indicateur force mot de passe */}
+          {password.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", gap: 4, marginBottom: 4 }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      flex: 1, height: 4, borderRadius: 2,
+                      backgroundColor: i < strength.score ? strength.color : "#E5E7EB",
+                    }}
+                  />
+                ))}
+              </View>
+              <Text style={{ fontSize: 12, color: strength.color, fontWeight: "600" }}>
+                Mot de passe {strength.label}
+              </Text>
+            </View>
+          )}
+
+          {/* Confirmer mot de passe */}
           <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
             Confirmer le mot de passe
           </Text>
@@ -118,11 +212,17 @@ export default function SignupScreen() {
             placeholderTextColor="#9CA3AF"
             secureTextEntry
             style={{
-              backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
+              backgroundColor: "#FFFFFF", borderWidth: 1,
+              borderColor: confirm.length > 0 && confirm !== password ? "#EF4444" : "#E5E7EB",
               borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
-              marginBottom: 28,
+              marginBottom: confirm.length > 0 && confirm !== password ? 4 : 28,
             }}
           />
+          {confirm.length > 0 && confirm !== password && (
+            <Text style={{ fontSize: 12, color: "#EF4444", marginBottom: 24 }}>
+              Les mots de passe ne correspondent pas
+            </Text>
+          )}
 
           <TouchableOpacity
             onPress={handleSignup}
