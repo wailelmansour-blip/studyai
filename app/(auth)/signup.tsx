@@ -12,7 +12,6 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore } from "@/store/languageStore";
 
-const { currentLanguage, setLanguage } = useLanguageStore();
 const getPasswordStrength = (pwd: string, lang: string): { label: string; color: string; score: number } => {
   let score = 0;
   if (pwd.length >= 8) score++;
@@ -33,7 +32,7 @@ const getPasswordStrength = (pwd: string, lang: string): { label: string; color:
 
 export default function SignupScreen() {
   const { signup, isLoading, error, clearError } = useAuthStore();
-  const { currentLanguage } = useLanguageStore();
+  const { currentLanguage, setLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
 
   const [firstName, setFirstName] = useState("");
@@ -89,12 +88,12 @@ export default function SignupScreen() {
     }
     clearError();
     try {
-     await signup(
-  email.trim(), password,
-  firstName.trim(), lastName.trim(),
-  birthDate.toISOString().split("T")[0],
-  currentLanguage
-);
+      await signup(
+        email.trim(), password,
+        firstName.trim(), lastName.trim(),
+        birthDate.toISOString().split("T")[0],
+        currentLanguage
+      );
       router.replace({
         pathname: "/(auth)/login",
         params: { email: email.trim(), justRegistered: "true" },
@@ -118,34 +117,34 @@ export default function SignupScreen() {
           contentContainerStyle={{ flexGrow: 1, padding: 24, paddingTop: 40, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ marginBottom: 24, alignSelf: isRTL ? "flex-end" : "flex-start" }}
-          >
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
-          </TouchableOpacity>
-          {/* Sélecteur langue */}
-<View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 16 }}>
-  {[
-    { code: "fr", flag: "🇫🇷" },
-    { code: "en", flag: "🇬🇧" },
-    { code: "ar", flag: "🇸🇦" },
-  ].map((lang) => (
-    <TouchableOpacity
-      key={lang.code}
-      onPress={() => setLanguage(lang.code as any)}
-      style={{
-        paddingHorizontal: 8, paddingVertical: 4,
-        marginLeft: 6, borderRadius: 8,
-        backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "transparent",
-        borderWidth: 1,
-        borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
-      }}
-    >
-      <Text style={{ fontSize: 20 }}>{lang.flag}</Text>
-    </TouchableOpacity>
-  ))}
-</View>
+          {/* Header : retour + sélecteur langue */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+            </TouchableOpacity>
+            <View style={{ flexDirection: "row" }}>
+              {[
+                { code: "fr", flag: "🇫🇷" },
+                { code: "en", flag: "🇬🇧" },
+                { code: "ar", flag: "🇸🇦" },
+              ].map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  onPress={() => setLanguage(lang.code as any)}
+                  style={{
+                    paddingHorizontal: 8, paddingVertical: 4,
+                    marginLeft: 6, borderRadius: 8,
+                    backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "transparent",
+                    borderWidth: 1,
+                    borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
+                  }}
+                >
+                  <Text style={{ fontSize: 20 }}>{lang.flag}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           <View style={{ marginBottom: 32 }}>
             <Text style={{ fontSize: 28, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
               {t.title}
