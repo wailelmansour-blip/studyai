@@ -1,7 +1,6 @@
 // store/languageStore.ts
 import { create } from "zustand";
 import i18n from "../i18n";
-import { I18nManager, Alert } from "react-native";
 
 export type Language = "fr" | "en" | "ar";
 
@@ -25,29 +24,15 @@ interface LanguageState {
   setLanguage: (lang: Language) => Promise<void>;
 }
 
-export const useLanguageStore = create<LanguageState>((set, get) => ({
+export const useLanguageStore = create<LanguageState>((set) => ({
   currentLanguage: "fr",
   isRTL: false,
 
   setLanguage: async (lang: Language) => {
     const option = LANGUAGES.find((l) => l.code === lang);
     if (!option) return;
-
-    // Changer la langue i18n immédiatement
     await i18n.changeLanguage(lang);
     set({ currentLanguage: lang, isRTL: option.isRTL });
-
-    // RTL nécessite un redémarrage de l'app
-    if (I18nManager.isRTL !== option.isRTL) {
-      I18nManager.allowRTL(option.isRTL);
-      I18nManager.forceRTL(option.isRTL);
-      Alert.alert(
-        option.isRTL ? "إعادة التشغيل مطلوبة" : "Restart Required",
-        option.isRTL
-          ? "يرجى إعادة تشغيل التطبيق لتفعيل اتجاه النص العربي."
-          : "Please restart the app to apply the RTL layout for Arabic.",
-        [{ text: "OK" }]
-      );
-    }
+    // I18nManager supprimé — RTL géré manuellement dans les composants
   },
 }));

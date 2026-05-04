@@ -1,6 +1,7 @@
 // app/_layout.tsx
 import "../i18n";
 import { useEffect } from "react";
+import { LogBox } from "react-native";
 import { Stack, router, useSegments } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
 import { useUsageStore } from "@/store/usageStore";
@@ -8,6 +9,13 @@ import { useNotificationStore } from "../store/notificationStore";
 import * as Notifications from "expo-notifications";
 import { useLanguageStore } from "../store/languageStore";
 import { trackConversion } from "../services/analytics";
+
+LogBox.ignoreLogs([
+  "Do not call Hooks inside useEffect",
+  "React has detected a change in the order of Hooks",
+  "expo-notifications",
+  "Push notifications",
+]);
 
 export default function RootLayout() {
   const { user, isInitialized, initialize } = useAuthStore();
@@ -31,6 +39,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!isInitialized) return;
+    if (!segments) return;
     const inAuthGroup = segments[0] === "(auth)";
     if (!user && !inAuthGroup) {
       router.replace("/(auth)/login");
@@ -38,7 +47,6 @@ export default function RootLayout() {
       if (user.emailVerified) {
         router.replace("/(tabs)/home");
       }
-      // email non vérifié → ne rien faire, signup gère la redirection
     }
   }, [user, isInitialized, segments]);
 
