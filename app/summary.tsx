@@ -24,7 +24,9 @@ import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 import { useDeleteHistory } from "../hooks/useDeleteHistory";
+import { useHistoryStore } from "../store/historyStore";
 import { ImportTextButton } from "../components/ImportTextButton"; // ← AJOUT
+
 
 const CACHE_KEY = "studyai_summaries";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -50,6 +52,7 @@ export default function SummaryScreen() {
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
   const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
+  const refreshTrigger = useHistoryStore((state) => state.refreshTrigger["summaries"] || 0);
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("summary"); // ← AJOUT Phase 17
 
   const [inputText, setInputText] = useState("");
@@ -115,7 +118,7 @@ export default function SummaryScreen() {
   }
 };
     loadCache();
-  }, []);
+  }, [refreshTrigger]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

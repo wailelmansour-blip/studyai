@@ -9,9 +9,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore, LANGUAGES, Language } from "../../store/languageStore";
 import { useTranslation } from "react-i18next";
-import { useNotificationStore } from "../../store/notificationStore"; // ← AJOUT Phase 16
-import { sendTestNotification } from "../../services/notifications";   // ← AJOUT Phase 16
-import DateTimePicker from "@react-native-community/datetimepicker";   // ← AJOUT Phase 16
+import { useNotificationStore } from "../../store/notificationStore";
+import { sendTestNotification } from "../../services/notifications";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { useDeleteHistory, HistoryType } from "../../hooks/useDeleteHistory";
+import { useHistoryStore } from "../../store/historyStore";
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -19,6 +21,9 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const [showLangModal, setShowLangModal] = useState(false);
   const [changingLang, setChangingLang] = useState(false);
+  const { confirmDeleteAll } = useDeleteHistory();
+  const { triggerRefresh } = useHistoryStore();
+
 
   // ── Phase 16 ──
   const {
@@ -67,7 +72,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
 
         <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 24 }}>
           {t("profile_title")}
@@ -159,7 +164,6 @@ export default function ProfileScreen() {
           🔔 {getLabel("Notifications", "Notifications", "الإشعارات")}
         </Text>
 
-        {/* Alerte permission manquante */}
         {!hasPermission && (
           <TouchableOpacity
             onPress={checkPermission}
@@ -185,7 +189,6 @@ export default function ProfileScreen() {
           backgroundColor: "#FFFFFF", borderRadius: 14,
           borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, overflow: "hidden",
         }}>
-          {/* Toggle général */}
           <View style={{
             flexDirection: "row", alignItems: "center", padding: 16,
             borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
@@ -207,7 +210,6 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Rappel d'étude quotidien */}
           <View style={{
             flexDirection: "row", alignItems: "center", padding: 16,
             borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
@@ -231,7 +233,7 @@ export default function ProfileScreen() {
             <Switch
               value={settings.studyReminderEnabled}
               onValueChange={() => {
-                if (!settings.enabled) return; // ← CORRECTION
+                if (!settings.enabled) return;
                 toggleStudyReminder(currentLanguage);
               }}
               trackColor={{ false: "#E5E7EB", true: "#6EE7B7" }}
@@ -239,7 +241,6 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Heure du rappel */}
           {settings.enabled && settings.studyReminderEnabled && (
             <TouchableOpacity
               onPress={() => setShowTimePicker(true)}
@@ -266,7 +267,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Alertes plan */}
           <View style={{
             flexDirection: "row", alignItems: "center", padding: 16,
             borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
@@ -289,7 +289,7 @@ export default function ProfileScreen() {
             <Switch
               value={settings.planAlertsEnabled}
               onValueChange={() => {
-                if (!settings.enabled) return; // ← CORRECTION
+                if (!settings.enabled) return;
                 togglePlanAlerts(currentLanguage);
               }}
               trackColor={{ false: "#E5E7EB", true: "#FCD34D" }}
@@ -297,7 +297,6 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Bouton test */}
           <TouchableOpacity
             onPress={() => sendTestNotification(currentLanguage)}
             disabled={!settings.enabled || !hasPermission}
@@ -320,6 +319,61 @@ export default function ProfileScreen() {
         </View>
         {/* ── fin Phase 16 ── */}
 
+        {/* ── Phase 19 : Section Historiques ── */}
+        <View style={{
+          backgroundColor: "#FFFFFF", borderRadius: 14,
+          borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, overflow: "hidden",
+        }}>
+          <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
+              {currentLanguage === "ar" ? "السجل والمحفوظات"
+                : currentLanguage === "en" ? "HISTORY & SAVED"
+                : "HISTORIQUE & SAUVEGARDES"}
+            </Text>
+          </View>
+          {[
+            { type: "quizzes" as HistoryType,      label: "Quiz",          icon: "🧠" },
+            { type: "flashcards" as HistoryType,   label: "Flashcards",    icon: "🃏" },
+            { type: "plans" as HistoryType,        label: "Plans d'étude", icon: "📅" },
+            { type: "summaries" as HistoryType,    label: "Résumés",       icon: "📄" },
+            { type: "explanations" as HistoryType, label: "Explications",  icon: "💡" },
+            { type: "solutions" as HistoryType,    label: "Solutions",     icon: "✏️" },
+            { type: "chatSessions" as HistoryType, label: "Chat IA",       icon: "💬" },
+          ].map(({ type, label, icon }, index, arr) => (
+            <View
+              key={type}
+              style={{
+                flexDirection: "row", alignItems: "center", padding: 14,
+                borderBottomWidth: index < arr.length - 1 ? 1 : 0,
+                borderBottomColor: "#F3F4F6",
+              }}
+            >
+              <View style={{
+                width: 36, height: 36, borderRadius: 10,
+                backgroundColor: "#FEF2F2", alignItems: "center", justifyContent: "center",
+                marginRight: 12,
+              }}>
+                <Text style={{ fontSize: 16 }}>{icon}</Text>
+              </View>
+              <Text style={{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "500" }}>
+                {label}
+              </Text>
+              <TouchableOpacity
+                onPress={() => confirmDeleteAll(type, label, currentLanguage, () => triggerRefresh(type))}
+                style={{
+                  backgroundColor: "#FEF2F2", paddingHorizontal: 10, paddingVertical: 6,
+                  borderRadius: 8, borderWidth: 1, borderColor: "#FECACA",
+                }}
+              >
+                <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                  {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+        {/* ── fin Phase 19 ── */}
+
         {/* Logout */}
         <TouchableOpacity
           onPress={handleLogout}
@@ -336,7 +390,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* DateTimePicker heure rappel — Phase 16 */}
       {showTimePicker && (
         <DateTimePicker
           value={reminderTime}
@@ -351,7 +404,6 @@ export default function ProfileScreen() {
         />
       )}
 
-      {/* Modal sélection langue */}
       <Modal
         visible={showLangModal}
         transparent

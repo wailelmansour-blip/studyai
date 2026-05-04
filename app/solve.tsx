@@ -26,6 +26,7 @@ import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useDeleteHistory } from "../hooks/useDeleteHistory"; // ← AJOUT Phase 17
 import { ImportTextButton } from "../components/ImportTextButton";
+import { useHistoryStore } from "../store/historyStore";
 
 const CACHE_KEY = "studyai_solutions";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -53,6 +54,7 @@ export default function SolveScreen() {
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
   const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
+  const refreshTrigger = useHistoryStore((state) => state.refreshTrigger["solutions"] || 0);
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("solve"); // ← AJOUT Phase 17
 
   const [exercise, setExercise] = useState("");
@@ -119,7 +121,7 @@ export default function SolveScreen() {
   }
 };
     loadCache();
-  }, []);
+  }, [refreshTrigger]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

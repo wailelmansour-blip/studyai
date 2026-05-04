@@ -1,5 +1,5 @@
 // app/quiz.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert,
@@ -24,6 +24,9 @@ import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useDeleteHistory } from "../hooks/useDeleteHistory";
+import { useHistoryStore } from "../store/historyStore";
+import { useFocusEffect } from "expo-router";
+
 
 const CACHE_KEY = "studyai_quizzes"; // ← AJOUT
 const CACHE_TTL = 24 * 60 * 60 * 1000; // ← AJOUT
@@ -57,6 +60,7 @@ export default function QuizScreen() {
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
   const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
+  const refreshTrigger = useHistoryStore((state) => state.refreshTrigger["quizzes"] || 0);
   const { startTracking, endTracking, trackView } = useAnalytics("quiz");
 
   const [topic, setTopic] = useState("");
@@ -76,61 +80,65 @@ export default function QuizScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  useEffect(() => {
-    trackView();
+  // Remplace tout le useEffect par ces deux blocs :
 
-    // ── Charger historique ── ← AJOUT
+useEffect(() => {
+  trackView();
+}, []);
+
+useFocusEffect(
+  useCallback(() => {
     const loadCache = async () => {
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-    // 1. Afficher le cache local immédiatement (UX rapide)
-    const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
-    if (raw) {
-      const { data } = JSON.parse(raw);
-      if (data?.length > 0) {
-        setCachedQuizzes(data);
-        setHasMore(data.length >= PAGE_SIZE);
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data } = JSON.parse(raw);
+          if (data?.length > 0) {
+            setCachedQuizzes(data);
+            setHasMore(data.length >= PAGE_SIZE);
+          }
+        }
+
+        const q = query(
+          collection(db, "quizzes"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          setCachedQuizzes([]);
+          return;
+        }
+
+        const fromFirestore: CachedQuiz[] = snap.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          topic: doc.data().topic || "",
+          score: doc.data().score || 0,
+          total: doc.data().total || 0,
+          questions: doc.data().questions || [],
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedQuizzes(fromFirestore);
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Quiz cache load error:", e);
       }
-    }
-
-    // 2. Toujours charger Firestore pour avoir les données à jour
-    const q = query(
-      collection(db, "quizzes"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(PAGE_SIZE)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) return;
-
-    const fromFirestore: CachedQuiz[] = snap.docs.map((doc) => ({
-      id: doc.id,
-      userId: doc.data().userId,
-      topic: doc.data().topic || "",
-      score: doc.data().score || 0,
-      total: doc.data().total || 0,
-      questions: doc.data().questions || [],
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-    }));
-
-    // 3. Mettre à jour UI + cache avec données Firestore
-    setCachedQuizzes(fromFirestore);
-    setLastDoc(snap.docs[snap.docs.length - 1]);
-    setHasMore(snap.docs.length === PAGE_SIZE);
-
-    await AsyncStorage.setItem(
-      `${CACHE_KEY}_${user.uid}`,
-      JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
-    );
-  } catch (e) {
-    console.log("Quiz cache load error:", e);
-  }
-};
+    };
     loadCache();
-  }, []);
-
+  }, [refreshTrigger])
+);
   // ── Charger plus ── ← AJOUT
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

@@ -27,6 +27,10 @@ import { limitInput } from "../utils/inputLimiter";
 import { schedulePlanAlert } from "../services/notifications";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 import { useDeleteHistory } from "../hooks/useDeleteHistory";
+import { useHistoryStore } from "../store/historyStore";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
+
 
 const CACHE_KEY = "studyai_plans";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -56,6 +60,7 @@ export default function PlanScreen() {
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
   const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
+  const refreshTrigger = useHistoryStore((state) => state.refreshTrigger["plans"] || 0);
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("plan"); // ← AJOUT Phase 17
 
   const [subjects, setSubjects] = useState<string[]>([""]);
@@ -74,61 +79,67 @@ export default function PlanScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  useEffect(() => {
-    trackView(); // ← AJOUT Phase 17
+  // Remplace tout le useEffect par ces deux blocs :
 
+useEffect(() => {
+  trackView();
+}, []);
+
+useFocusEffect(
+  useCallback(() => {
     const loadCache = async () => {
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-    // 1. Afficher le cache local immédiatement (UX rapide)
-    const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
-    if (raw) {
-      const { data } = JSON.parse(raw);
-      if (data?.length > 0) {
-        setCachedPlans(data);
-        setHasMore(data.length >= PAGE_SIZE);
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data } = JSON.parse(raw);
+          if (data?.length > 0) {
+            setCachedPlans(data);
+            setHasMore(data.length >= PAGE_SIZE);
+          }
+        }
+
+        const q = query(
+          collection(db, "plans"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          setCachedPlans([]);
+          return;
+        }
+
+        const fromFirestore: CachedPlan[] = snap.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          title: doc.data().title || "",
+          subjects: doc.data().subjects || [],
+          examDate: doc.data().examDate || "",
+          totalDays: doc.data().totalDays || 0,
+          sessions: doc.data().sessions || [],
+          tips: doc.data().tips || [],
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedPlans(fromFirestore);
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Plan cache load error:", e);
       }
-    }
-
-    // 2. Toujours charger Firestore pour avoir les données à jour
-    const q = query(
-      collection(db, "plans"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(PAGE_SIZE)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) return;
-
-    const fromFirestore: CachedPlan[] = snap.docs.map((doc) => ({
-      id: doc.id,
-      userId: doc.data().userId,
-      title: doc.data().title || "",
-      subjects: doc.data().subjects || [],
-      examDate: doc.data().examDate || "",
-      totalDays: doc.data().totalDays || 0,
-      sessions: doc.data().sessions || [],
-      tips: doc.data().tips || [],
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-    }));
-
-    // 3. Mettre à jour UI + cache avec données Firestore
-    setCachedPlans(fromFirestore);
-    setLastDoc(snap.docs[snap.docs.length - 1]);
-    setHasMore(snap.docs.length === PAGE_SIZE);
-
-    await AsyncStorage.setItem(
-      `${CACHE_KEY}_${user.uid}`,
-      JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
-    );
-  } catch (e) {
-    console.log("Plan cache load error:", e);
-  }
-};
+    };
     loadCache();
-  }, []);
+  }, [refreshTrigger])
+);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

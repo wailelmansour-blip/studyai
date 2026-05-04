@@ -25,6 +25,9 @@ import { UsageBanner } from "../components/UsageBanner";
 import { limitInput } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 import { useDeleteHistory } from "../hooks/useDeleteHistory";
+import { useHistoryStore } from "../store/historyStore";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 
 const CACHE_KEY = "studyai_chatSessions";
 const PAGE_SIZE = 5;
@@ -87,6 +90,7 @@ function MessageText({
 export default function ChatScreen() {
   const app = getApp();
   const auth = getAuth(app);
+  const db = getFirestore(app);
   const functions = getFunctions(app, "us-central1");
   const { createSession, addMessage } = useChatStore();
   const { t } = useTranslation();
@@ -94,6 +98,7 @@ export default function ChatScreen() {
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
   const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
+  const refreshTrigger = useHistoryStore((state) => state.refreshTrigger["chatSessions"] || 0);
   const { startTracking, endTracking, trackView } = useAnalytics("chat"); // ← AJOUT Phase 17
 
   const COURSES =
@@ -101,7 +106,7 @@ export default function ChatScreen() {
     : currentLanguage === "en" ? COURSES_EN
     : COURSES_FR;
 
-  const db = getFirestore(app);
+  
   
 
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
@@ -117,9 +122,13 @@ export default function ChatScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  useEffect(() => {
-    trackView();
+  // Remplacer tout le useEffect par ces deux blocs :
+useEffect(() => {
+  trackView();
+}, []);
 
+useFocusEffect(
+  useCallback(() => {
     const loadCache = async () => {
       try {
         const user = auth.currentUser;
@@ -141,7 +150,10 @@ export default function ChatScreen() {
           limit(PAGE_SIZE)
         );
         const snap = await getDocs(q);
-        if (snap.empty) return;
+        if (snap.empty) {
+          setCachedSessions([]);
+          return;
+        }
 
         const fromFirestore: CachedChatSession[] = snap.docs.map((d) => ({
           id: d.id,
@@ -163,7 +175,8 @@ export default function ChatScreen() {
       }
     };
     loadCache();
-  }, []);
+  }, [refreshTrigger])
+);
 
   useEffect(() => {
     setTimeout(() => {

@@ -25,6 +25,7 @@ import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 import { useDeleteHistory } from "../hooks/useDeleteHistory";
+import { useHistoryStore } from "../store/historyStore";
 
 const CACHE_KEY = "studyai_flashcards";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -50,6 +51,7 @@ export default function FlashcardsScreen() {
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
   const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
+  const refreshTrigger = useHistoryStore((state) => state.refreshTrigger["flashcards"] || 0);
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("flashcards"); // ← AJOUT Phase 17
 
   const [topic, setTopic] = useState("");
@@ -116,7 +118,7 @@ export default function FlashcardsScreen() {
   }
 };
     loadCache();
-  }, []);
+  }, [refreshTrigger]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;
