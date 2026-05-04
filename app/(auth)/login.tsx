@@ -14,13 +14,15 @@ import {
   sendEmailVerification, signOut,
 } from "firebase/auth";
 import app from "@/src/config/firebase";
+import { useLocalSearchParams } from "expo-router";
 
 export default function LoginScreen() {
+  const params = useLocalSearchParams<{ email?: string; justRegistered?: string }>();
   const { login, isLoading, error, clearError } = useAuthStore();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(params.email || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showResend, setShowResend] = useState(false);
+  const [showResend, setShowResend] = useState(params.justRegistered === "true");
   const [resending, setResending] = useState(false);
 
   const handleLogin = async () => {
