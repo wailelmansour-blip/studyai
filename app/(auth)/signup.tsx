@@ -8,6 +8,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuthStore } from "@/store/authStore";
 
 const getPasswordStrength = (pwd: string): { label: string; color: string; score: number } => {
@@ -16,7 +17,6 @@ const getPasswordStrength = (pwd: string): { label: string; color: string; score
   if (/[A-Z]/.test(pwd)) score++;
   if (/[0-9]/.test(pwd)) score++;
   if (/[^A-Za-z0-9]/.test(pwd)) score++;
-
   if (score <= 1) return { label: "Faible", color: "#EF4444", score };
   if (score === 2) return { label: "Moyen", color: "#F59E0B", score };
   if (score === 3) return { label: "Bien", color: "#10B981", score };
@@ -25,6 +25,11 @@ const getPasswordStrength = (pwd: string): { label: string; color: string; score
 
 export default function SignupScreen() {
   const { signup, isLoading, error, clearError } = useAuthStore();
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [birthDate, setBirthDate] = useState<Date>(new Date(2000, 0, 1));
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -33,7 +38,14 @@ export default function SignupScreen() {
 
   const strength = getPasswordStrength(password);
 
+  const formatDate = (date: Date) =>
+    `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+
   const handleSignup = async () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      Alert.alert("Erreur", "Prénom et nom requis.");
+      return;
+    }
     if (!email.trim() || !password.trim()) {
       Alert.alert("Erreur", "Email et mot de passe requis.");
       return;
@@ -46,9 +58,16 @@ export default function SignupScreen() {
       Alert.alert("Erreur", "Minimum 6 caractères.");
       return;
     }
+
     clearError();
     try {
-      await signup(email.trim(), password);
+      await signup(
+        email.trim(),
+        password,
+        firstName.trim(),
+        lastName.trim(),
+        birthDate.toISOString().split("T")[0]
+      );
       setEmailSent(true);
     } catch (e: any) {
       if (e.code === "auth/email-already-in-use") {
@@ -100,9 +119,7 @@ export default function SignupScreen() {
             onPress={() => router.back()}
             style={{ alignItems: "center", padding: 8 }}
           >
-            <Text style={{ fontSize: 14, color: "#6B7280" }}>
-              Retour
-            </Text>
+            <Text style={{ fontSize: 14, color: "#6B7280" }}>Retour</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -116,7 +133,7 @@ export default function SignupScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center" }}
+          contentContainerStyle={{ flexGrow: 1, padding: 24, paddingTop: 40, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity
@@ -134,6 +151,71 @@ export default function SignupScreen() {
               Rejoins StudyAI gratuitement
             </Text>
           </View>
+
+          {/* Prénom */}
+          <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
+            Prénom
+          </Text>
+          <TextInput
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="Ton prénom"
+            placeholderTextColor="#9CA3AF"
+            autoCapitalize="words"
+            style={{
+              backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
+              borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
+              marginBottom: 16,
+            }}
+          />
+
+          {/* Nom */}
+          <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
+            Nom
+          </Text>
+          <TextInput
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Ton nom"
+            placeholderTextColor="#9CA3AF"
+            autoCapitalize="words"
+            style={{
+              backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
+              borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
+              marginBottom: 16,
+            }}
+          />
+
+          {/* Date de naissance */}
+          <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
+            Date de naissance
+          </Text>
+          <TouchableOpacity
+            onPress={() => setShowDatePicker(true)}
+            style={{
+              backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
+              borderRadius: 12, padding: 14, marginBottom: 16,
+              flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+            }}
+          >
+            <Text style={{ fontSize: 15, color: "#111827" }}>
+              {formatDate(birthDate)}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={birthDate}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              maximumDate={new Date()}
+              minimumDate={new Date(1900, 0, 1)}
+              onChange={(_, date) => {
+                setShowDatePicker(false);
+                if (date) setBirthDate(date);
+              }}
+            />
+          )}
 
           {/* Email */}
           <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
@@ -181,7 +263,7 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Indicateur force mot de passe */}
+          {/* Indicateur force */}
           {password.length > 0 && (
             <View style={{ marginBottom: 16 }}>
               <View style={{ flexDirection: "row", gap: 4, marginBottom: 4 }}>
@@ -201,7 +283,7 @@ export default function SignupScreen() {
             </View>
           )}
 
-          {/* Confirmer mot de passe */}
+          {/* Confirmer */}
           <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8 }}>
             Confirmer le mot de passe
           </Text>
@@ -248,9 +330,7 @@ export default function SignupScreen() {
           >
             <Text style={{ fontSize: 14, color: "#6B7280" }}>
               Déjà un compte ?{" "}
-              <Text style={{ color: "#6366F1", fontWeight: "600" }}>
-                Se connecter
-              </Text>
+              <Text style={{ color: "#6366F1", fontWeight: "600" }}>Se connecter</Text>
             </Text>
           </TouchableOpacity>
         </ScrollView>

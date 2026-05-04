@@ -10,6 +10,9 @@ import {
   reload,
   User,
 } from "firebase/auth";
+import {
+  getFirestore, doc, setDoc,
+} from "firebase/firestore";
 import app from "../src/config/firebase";
 
 const auth = getAuth(app);
@@ -20,7 +23,13 @@ interface AuthState {
   isInitialized: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  signup: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    birthDate: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
   initialize: () => () => void;
@@ -45,7 +54,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      // Bloquer si email non vérifié
       if (!cred.user.emailVerified) {
         await signOut(auth);
         set({ isLoading: false, error: "email_not_verified" });
@@ -58,12 +66,37 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signup: async (email, password) => {
+  signup: async (email, password, firstName, lastName, birthDate) => {
     set({ isLoading: true, error: null });
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
+
+      // Calculer l'âge
+      const birth = new Date(birthDate);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+
+      const isChild = age < 13;
+
+      // Sauvegarder le profil dans Firestore
+      const db = getFirestore(app);
+      await setDoc(doc(db, "users", cred.user.uid), {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        birthDate,
+        age,
+        email: email.trim().toLowerCase(),
+        isChild,
+        plan: "free",
+        isVerified: false,
+        createdAt: new Date().toISOString(),
+      });
+
       // Envoyer email de vérification
       await sendEmailVerification(cred.user);
+
       // Déconnecter jusqu'à vérification
       await signOut(auth);
       set({ isLoading: false });
