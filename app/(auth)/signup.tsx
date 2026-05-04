@@ -12,6 +12,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore } from "@/store/languageStore";
 
+const { currentLanguage, setLanguage } = useLanguageStore();
 const getPasswordStrength = (pwd: string, lang: string): { label: string; color: string; score: number } => {
   let score = 0;
   if (pwd.length >= 8) score++;
@@ -123,7 +124,28 @@ export default function SignupScreen() {
           >
             <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
           </TouchableOpacity>
-
+          {/* Sélecteur langue */}
+<View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 16 }}>
+  {[
+    { code: "fr", flag: "🇫🇷" },
+    { code: "en", flag: "🇬🇧" },
+    { code: "ar", flag: "🇸🇦" },
+  ].map((lang) => (
+    <TouchableOpacity
+      key={lang.code}
+      onPress={() => setLanguage(lang.code as any)}
+      style={{
+        paddingHorizontal: 8, paddingVertical: 4,
+        marginLeft: 6, borderRadius: 8,
+        backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "transparent",
+        borderWidth: 1,
+        borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
+      }}
+    >
+      <Text style={{ fontSize: 20 }}>{lang.flag}</Text>
+    </TouchableOpacity>
+  ))}
+</View>
           <View style={{ marginBottom: 32 }}>
             <Text style={{ fontSize: 28, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
               {t.title}

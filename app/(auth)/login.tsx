@@ -15,6 +15,7 @@ import {
   sendEmailVerification, signOut,
 } from "firebase/auth";
 import app from "@/src/config/firebase";
+const { currentLanguage, setLanguage } = useLanguageStore();
 
 export default function LoginScreen() {
   const params = useLocalSearchParams<{ email?: string; justRegistered?: string }>();
@@ -89,9 +90,33 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView
+        
           contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center" }}
           keyboardShouldPersistTaps="handled"
         >
+
+          {/* Sélecteur langue */}
+<View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 16 }}>
+  {[
+    { code: "fr", flag: "🇫🇷" },
+    { code: "en", flag: "🇬🇧" },
+    { code: "ar", flag: "🇸🇦" },
+  ].map((lang) => (
+    <TouchableOpacity
+      key={lang.code}
+      onPress={() => setLanguage(lang.code as any)}
+      style={{
+        paddingHorizontal: 8, paddingVertical: 4,
+        marginLeft: 6, borderRadius: 8,
+        backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "transparent",
+        borderWidth: 1,
+        borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
+      }}
+    >
+      <Text style={{ fontSize: 20 }}>{lang.flag}</Text>
+    </TouchableOpacity>
+  ))}
+</View>
           {/* Logo */}
           <View style={{ alignItems: "center", marginBottom: 40 }}>
             <View style={{
