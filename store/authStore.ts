@@ -17,18 +17,89 @@ import app from "../src/config/firebase";
 
 const auth = getAuth(app);
 
+const getFirebaseError = (code: string, lang: string): string => {
+  const errors: Record<string, { fr: string; en: string; ar: string }> = {
+    "auth/invalid-email": {
+      fr: "Adresse email invalide.",
+      en: "Invalid email address.",
+      ar: "البريد الإلكتروني غير صالح.",
+    },
+    "auth/user-disabled": {
+      fr: "Ce compte a été désactivé.",
+      en: "This account has been disabled.",
+      ar: "تم تعطيل هذا الحساب.",
+    },
+    "auth/user-not-found": {
+      fr: "Aucun compte trouvé avec cet email.",
+      en: "No account found with this email.",
+      ar: "لا يوجد حساب بهذا البريد الإلكتروني.",
+    },
+    "auth/wrong-password": {
+      fr: "Mot de passe incorrect.",
+      en: "Incorrect password.",
+      ar: "كلمة المرور غير صحيحة.",
+    },
+    "auth/email-already-in-use": {
+      fr: "Un compte existe déjà avec cet email.",
+      en: "An account already exists with this email.",
+      ar: "يوجد حساب بهذا البريد الإلكتروني.",
+    },
+    "auth/weak-password": {
+      fr: "Mot de passe trop faible. Minimum 6 caractères.",
+      en: "Password too weak. Minimum 6 characters.",
+      ar: "كلمة المرور ضعيفة جداً. 6 أحرف على الأقل.",
+    },
+    "auth/network-request-failed": {
+      fr: "Erreur réseau. Vérifie ta connexion internet.",
+      en: "Network error. Check your internet connection.",
+      ar: "خطأ في الشبكة. تحقق من اتصالك بالإنترنت.",
+    },
+    "auth/too-many-requests": {
+      fr: "Trop de tentatives. Réessaie dans quelques minutes.",
+      en: "Too many attempts. Try again in a few minutes.",
+      ar: "محاولات كثيرة جداً. حاول مجدداً بعد دقائق.",
+    },
+    "auth/invalid-credential": {
+      fr: "Identifiants incorrects. Vérifie ton email et mot de passe.",
+      en: "Invalid credentials. Check your email and password.",
+      ar: "بيانات غير صحيحة. تحقق من بريدك وكلمة المرور.",
+    },
+    "auth/requires-recent-login": {
+      fr: "Session expirée. Reconnecte-toi pour continuer.",
+      en: "Session expired. Please sign in again.",
+      ar: "انتهت الجلسة. سجّل دخولك مجدداً.",
+    },
+    "email_not_verified": {
+      fr: "Email non vérifié.",
+      en: "Email not verified.",
+      ar: "البريد الإلكتروني غير مؤكد.",
+    },
+  };
+
+  const entry = errors[code];
+  if (!entry) {
+    if (lang === "ar") return "حدث خطأ. حاول مجدداً.";
+    if (lang === "en") return "An error occurred. Please try again.";
+    return "Une erreur s'est produite. Réessaie.";
+  }
+  if (lang === "ar") return entry.ar;
+  if (lang === "en") return entry.en;
+  return entry.fr;
+};
+
 interface AuthState {
   user: User | null;
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, lang?: string) => Promise<void>;
   signup: (
     email: string,
     password: string,
     firstName: string,
     lastName: string,
-    birthDate: string
+    birthDate: string,
+    lang?: string
   ) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -50,7 +121,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return unsubscribe;
   },
 
-  login: async (email, password) => {
+  login: async (email, password, lang = "fr") => {
     set({ isLoading: true, error: null });
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -61,26 +132,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       set({ isLoading: false });
     } catch (e: any) {
-      set({ isLoading: false, error: e.message });
+      const msg = e.message === "email_not_verified"
+        ? "email_not_verified"
+        : getFirebaseError(e.code, lang);
+      set({ isLoading: false, error: msg });
       throw e;
     }
   },
 
-  signup: async (email, password, firstName, lastName, birthDate) => {
+  signup: async (email, password, firstName, lastName, birthDate, lang = "fr") => {
     set({ isLoading: true, error: null });
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-      // Calculer l'âge
       const birth = new Date(birthDate);
       const today = new Date();
       let age = today.getFullYear() - birth.getFullYear();
       const m = today.getMonth() - birth.getMonth();
       if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-
       const isChild = age < 13;
 
-      // Sauvegarder le profil dans Firestore
       const db = getFirestore(app);
       await setDoc(doc(db, "users", cred.user.uid), {
         firstName: firstName.trim(),
@@ -94,14 +165,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         createdAt: new Date().toISOString(),
       });
 
-      // Envoyer email de vérification
       await sendEmailVerification(cred.user);
-
-      // Déconnecter jusqu'à vérification
       await signOut(auth);
       set({ isLoading: false });
     } catch (e: any) {
-      set({ isLoading: false, error: e.message });
+      const msg = getFirebaseError(e.code, lang);
+      set({ isLoading: false, error: msg });
       throw e;
     }
   },
@@ -120,9 +189,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const currentUser = auth.currentUser;
-      if (currentUser) {
-        await sendEmailVerification(currentUser);
-      }
+      if (currentUser) await sendEmailVerification(currentUser);
       set({ isLoading: false });
     } catch (e: any) {
       set({ isLoading: false, error: e.message });

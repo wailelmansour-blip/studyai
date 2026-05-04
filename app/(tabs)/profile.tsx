@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
-  Alert, Modal, Switch, Platform,ActivityIndicator,
+  Alert, Modal, Switch, Platform, ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,59 +21,15 @@ export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
   const { currentLanguage, setLanguage } = useLanguageStore();
   const { t } = useTranslation();
+  const isRTL = currentLanguage === "ar";
+
   const [showLangModal, setShowLangModal] = useState(false);
   const [changingLang, setChangingLang] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
   const { confirmDeleteAll } = useDeleteHistory();
-
-const functions = getFunctions(getApp(), "us-central1");
-const [deletingAccount, setDeletingAccount] = useState(false);
-
-const handleDeleteAccount = () => {
-  Alert.alert(
-    currentLanguage === "ar" ? "حذف الحساب" 
-      : currentLanguage === "en" ? "Delete Account" 
-      : "Supprimer le compte",
-    currentLanguage === "ar" 
-      ? "هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً."
-      : currentLanguage === "en"
-      ? "This action cannot be undone. All your data will be permanently deleted."
-      : "Cette action est irréversible. Toutes vos données seront définitivement supprimées.",
-    [
-      { 
-        text: currentLanguage === "ar" ? "إلغاء" : currentLanguage === "en" ? "Cancel" : "Annuler",
-        style: "cancel" 
-      },
-      {
-        text: currentLanguage === "ar" ? "حذف نهائياً" : currentLanguage === "en" ? "Delete permanently" : "Supprimer définitivement",
-        style: "destructive",
-        onPress: confirmDeleteAccount,
-      },
-    ]
-  );
-};
-
-const confirmDeleteAccount = async () => {
-  setDeletingAccount(true);
-  try {
-    const fn = httpsCallable(functions, "deleteAccount");
-    await fn({});
-    await logout();
-  } catch (e: any) {
-    Alert.alert(
-      currentLanguage === "ar" ? "خطأ" : currentLanguage === "en" ? "Error" : "Erreur",
-      e.message || (
-        currentLanguage === "ar" ? "فشل حذف الحساب"
-        : currentLanguage === "en" ? "Failed to delete account"
-        : "Échec de la suppression du compte"
-      )
-    );
-  } finally {
-    setDeletingAccount(false);
-  }
-};
-
   const { triggerRefresh } = useHistoryStore();
-
+  const functions = getFunctions(getApp(), "us-central1");
 
   // ── Phase 16 ──
   const {
@@ -93,6 +49,24 @@ const confirmDeleteAccount = async () => {
 
   const displayName = user?.email?.split("@")[0] || "Étudiant";
   const currentLang = LANGUAGES.find((l) => l.code === currentLanguage);
+
+  const getLabel = (fr: string, en: string, ar: string) =>
+    currentLanguage === "ar" ? ar : currentLanguage === "en" ? en : fr;
+
+  const deleteLabels = {
+    title:   getLabel("Supprimer le compte",               "Delete Account",                  "حذف الحساب"),
+    msg:     getLabel("Cette action est irréversible. Toutes vos données seront définitivement supprimées.", "This action cannot be undone. All your data will be permanently deleted.", "هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً."),
+    cancel:  getLabel("Annuler",                           "Cancel",                          "إلغاء"),
+    confirm: getLabel("Supprimer définitivement",          "Delete permanently",              "حذف نهائياً"),
+    btn:     getLabel("Supprimer mon compte",              "Delete my account",               "حذف الحساب نهائياً"),
+    error:   getLabel("Échec de la suppression du compte", "Failed to delete account",        "فشل حذف الحساب"),
+    errTitle:getLabel("Erreur",                            "Error",                           "خطأ"),
+  };
+
+  const historyLabels = {
+    title:    getLabel("HISTORIQUE & SAUVEGARDES", "HISTORY & SAVED",   "السجل والمحفوظات"),
+    clearAll: getLabel("Tout effacer",             "Clear all",          "حذف الكل"),
+  };
 
   const handleLogout = () => {
     Alert.alert(t("logout"), t("logout_confirm"), [
@@ -117,14 +91,41 @@ const confirmDeleteAccount = async () => {
     }
   };
 
-  const getLabel = (fr: string, en: string, ar: string) =>
-    currentLanguage === "ar" ? ar : currentLanguage === "en" ? en : fr;
+  const handleDeleteAccount = () => {
+    Alert.alert(deleteLabels.title, deleteLabels.msg, [
+      { text: deleteLabels.cancel, style: "cancel" },
+      { text: deleteLabels.confirm, style: "destructive", onPress: confirmDeleteAccount },
+    ]);
+  };
+
+  const confirmDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      const fn = httpsCallable(functions, "deleteAccount");
+      await fn({});
+      await logout();
+    } catch (e: any) {
+      Alert.alert(deleteLabels.errTitle, e.message || deleteLabels.error);
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  const HISTORY_ITEMS: { type: HistoryType; labelFr: string; labelEn: string; labelAr: string; icon: string }[] = [
+    { type: "quizzes",      labelFr: "Quiz",           labelEn: "Quizzes",       labelAr: "اختبارات",    icon: "🧠" },
+    { type: "flashcards",   labelFr: "Flashcards",     labelEn: "Flashcards",    labelAr: "بطاقات",      icon: "🃏" },
+    { type: "plans",        labelFr: "Plans d'étude",  labelEn: "Study Plans",   labelAr: "خطط الدراسة", icon: "📅" },
+    { type: "summaries",    labelFr: "Résumés",        labelEn: "Summaries",     labelAr: "ملخصات",      icon: "📄" },
+    { type: "explanations", labelFr: "Explications",   labelEn: "Explanations",  labelAr: "شروحات",      icon: "💡" },
+    { type: "solutions",    labelFr: "Solutions",      labelEn: "Solutions",     labelAr: "حلول",        icon: "✏️" },
+    { type: "chatSessions", labelFr: "Chat IA",        labelEn: "AI Chat",       labelAr: "محادثات الذكاء", icon: "💬" },
+  ];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
 
-        <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 24 }}>
+        <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 24, textAlign: isRTL ? "right" : "left" }}>
           {t("profile_title")}
         </Text>
 
@@ -154,62 +155,71 @@ const confirmDeleteAccount = async () => {
           <TouchableOpacity
             onPress={() => setShowLangModal(true)}
             style={{
-              flexDirection: "row", alignItems: "center", padding: 16,
+              flexDirection: isRTL ? "row-reverse" : "row",
+              alignItems: "center", padding: 16,
               borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
             }}
           >
             <View style={{
               width: 36, height: 36, borderRadius: 10,
-              backgroundColor: "#EEF2FF" + "15",
-              alignItems: "center", justifyContent: "center", marginRight: 12,
+              backgroundColor: "#EEF2FF15",
+              alignItems: "center", justifyContent: "center",
+              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
             }}>
               <Text style={{ fontSize: 18 }}>{currentLang?.flag}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2 }}>
+              <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2, textAlign: isRTL ? "right" : "left" }}>
                 {t("language")}
               </Text>
-              <Text style={{ fontSize: 14, color: "#374151", fontWeight: "500" }}>
+              <Text style={{ fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
                 {currentLang?.nativeLabel}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+            <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
           </TouchableOpacity>
 
           {/* Email */}
           <View style={{
-            flexDirection: "row", alignItems: "center", padding: 16,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", padding: 16,
             borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
           }}>
             <View style={{
               width: 36, height: 36, borderRadius: 10, backgroundColor: "#6366F115",
-              alignItems: "center", justifyContent: "center", marginRight: 12,
+              alignItems: "center", justifyContent: "center",
+              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
             }}>
               <Ionicons name="mail-outline" size={18} color="#6366F1" />
             </View>
-            <Text style={{ fontSize: 14, color: "#374151", flex: 1 }}>
+            <Text style={{ fontSize: 14, color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }}>
               {user?.email}
             </Text>
           </View>
 
           {/* Compte vérifié */}
-          <View style={{ flexDirection: "row", alignItems: "center", padding: 16 }}>
+          <View style={{
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", padding: 16,
+          }}>
             <View style={{
               width: 36, height: 36, borderRadius: 10, backgroundColor: "#10B98115",
-              alignItems: "center", justifyContent: "center", marginRight: 12,
+              alignItems: "center", justifyContent: "center",
+              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
             }}>
               <Ionicons name="shield-checkmark-outline" size={18} color="#10B981" />
             </View>
-            <Text style={{ fontSize: 14, color: "#374151", flex: 1 }}>
+            <Text style={{ fontSize: 14, color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }}>
               {t("verified_account")}
             </Text>
           </View>
         </View>
 
-        {/* ── Phase 16 : Section Notifications ── */}
+        {/* ── Section Notifications ── */}
         <Text style={{
           fontSize: 15, fontWeight: "700", color: "#111827",
           marginBottom: 10, marginTop: 8,
+          textAlign: isRTL ? "right" : "left",
         }}>
           🔔 {getLabel("Notifications", "Notifications", "الإشعارات")}
         </Text>
@@ -219,19 +229,20 @@ const confirmDeleteAccount = async () => {
             onPress={checkPermission}
             style={{
               backgroundColor: "#FFFBEB", borderRadius: 12, padding: 12,
-              flexDirection: "row", alignItems: "center", marginBottom: 12,
+              flexDirection: isRTL ? "row-reverse" : "row",
+              alignItems: "center", marginBottom: 12,
               borderWidth: 1, borderColor: "#FCD34D", gap: 8,
             }}
           >
             <Ionicons name="warning-outline" size={18} color="#F59E0B" />
-            <Text style={{ fontSize: 13, color: "#92400E", flex: 1 }}>
+            <Text style={{ fontSize: 13, color: "#92400E", flex: 1, textAlign: isRTL ? "right" : "left" }}>
               {getLabel(
                 "Autorise les notifications pour activer les rappels",
                 "Allow notifications to enable reminders",
                 "اسمح بالإشعارات لتفعيل التذكيرات"
               )}
             </Text>
-            <Ionicons name="chevron-forward" size={14} color="#F59E0B" />
+            <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={14} color="#F59E0B" />
           </TouchableOpacity>
         )}
 
@@ -239,17 +250,20 @@ const confirmDeleteAccount = async () => {
           backgroundColor: "#FFFFFF", borderRadius: 14,
           borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, overflow: "hidden",
         }}>
+          {/* Toggle général */}
           <View style={{
-            flexDirection: "row", alignItems: "center", padding: 16,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", padding: 16,
             borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
           }}>
             <View style={{
               width: 36, height: 36, borderRadius: 10, backgroundColor: "#6366F115",
-              alignItems: "center", justifyContent: "center", marginRight: 12,
+              alignItems: "center", justifyContent: "center",
+              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
             }}>
               <Ionicons name="notifications-outline" size={18} color="#6366F1" />
             </View>
-            <Text style={{ fontSize: 14, color: "#374151", flex: 1 }}>
+            <Text style={{ fontSize: 14, color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }}>
               {getLabel("Activer les notifications", "Enable notifications", "تفعيل الإشعارات")}
             </Text>
             <Switch
@@ -260,22 +274,25 @@ const confirmDeleteAccount = async () => {
             />
           </View>
 
+          {/* Rappel quotidien */}
           <View style={{
-            flexDirection: "row", alignItems: "center", padding: 16,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", padding: 16,
             borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
             opacity: settings.enabled ? 1 : 0.4,
           }}>
             <View style={{
               width: 36, height: 36, borderRadius: 10, backgroundColor: "#10B98115",
-              alignItems: "center", justifyContent: "center", marginRight: 12,
+              alignItems: "center", justifyContent: "center",
+              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
             }}>
               <Ionicons name="book-outline" size={18} color="#10B981" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, color: "#374151" }}>
+              <Text style={{ fontSize: 14, color: "#374151", textAlign: isRTL ? "right" : "left" }}>
                 {getLabel("Rappel d'étude quotidien", "Daily study reminder", "تذكير يومي للدراسة")}
               </Text>
-              <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>
+              <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2, textAlign: isRTL ? "right" : "left" }}>
                 {String(settings.studyReminderHour).padStart(2, "0")}:
                 {String(settings.studyReminderMinute).padStart(2, "0")}
               </Text>
@@ -291,48 +308,54 @@ const confirmDeleteAccount = async () => {
             />
           </View>
 
+          {/* Heure du rappel */}
           {settings.enabled && settings.studyReminderEnabled && (
             <TouchableOpacity
               onPress={() => setShowTimePicker(true)}
               style={{
-                flexDirection: "row", alignItems: "center", padding: 16,
+                flexDirection: isRTL ? "row-reverse" : "row",
+                alignItems: "center", padding: 16,
                 borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
                 backgroundColor: "#F8F9FA",
               }}
             >
               <View style={{
                 width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF",
-                alignItems: "center", justifyContent: "center", marginRight: 12,
+                alignItems: "center", justifyContent: "center",
+                marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
               }}>
                 <Ionicons name="time-outline" size={18} color="#6366F1" />
               </View>
-              <Text style={{ fontSize: 14, color: "#374151", flex: 1 }}>
+              <Text style={{ fontSize: 14, color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }}>
                 {getLabel("Heure du rappel", "Reminder time", "وقت التذكير")}
               </Text>
               <Text style={{ fontSize: 14, fontWeight: "600", color: "#6366F1" }}>
                 {String(settings.studyReminderHour).padStart(2, "0")}:
                 {String(settings.studyReminderMinute).padStart(2, "0")}
               </Text>
-              <Ionicons name="chevron-forward" size={16} color="#D1D5DB" style={{ marginLeft: 6 }} />
+              <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           )}
 
+          {/* Alertes plan */}
           <View style={{
-            flexDirection: "row", alignItems: "center", padding: 16,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", padding: 16,
             borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
             opacity: settings.enabled ? 1 : 0.4,
           }}>
             <View style={{
               width: 36, height: 36, borderRadius: 10, backgroundColor: "#FEF3C715",
-              alignItems: "center", justifyContent: "center", marginRight: 12,
+              alignItems: "center", justifyContent: "center",
+              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
             }}>
               <Ionicons name="calendar-outline" size={18} color="#F59E0B" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, color: "#374151" }}>
+              <Text style={{ fontSize: 14, color: "#374151", textAlign: isRTL ? "right" : "left" }}>
                 {getLabel("Alertes plan d'étude", "Study plan alerts", "تنبيهات خطة الدراسة")}
               </Text>
-              <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>
+              <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2, textAlign: isRTL ? "right" : "left" }}>
                 {getLabel("Rappel J-1 avant l'examen", "Reminder 1 day before exam", "تذكير قبل الامتحان بيوم")}
               </Text>
             </View>
@@ -347,122 +370,119 @@ const confirmDeleteAccount = async () => {
             />
           </View>
 
+          {/* Bouton test */}
           <TouchableOpacity
             onPress={() => sendTestNotification(currentLanguage)}
             disabled={!settings.enabled || !hasPermission}
             style={{
-              flexDirection: "row", alignItems: "center", padding: 16,
+              flexDirection: isRTL ? "row-reverse" : "row",
+              alignItems: "center", padding: 16,
               opacity: settings.enabled && hasPermission ? 1 : 0.4,
             }}
           >
             <View style={{
               width: 36, height: 36, borderRadius: 10, backgroundColor: "#F3F4F6",
-              alignItems: "center", justifyContent: "center", marginRight: 12,
+              alignItems: "center", justifyContent: "center",
+              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
             }}>
               <Ionicons name="paper-plane-outline" size={18} color="#6B7280" />
             </View>
-            <Text style={{ fontSize: 14, color: "#374151", flex: 1 }}>
+            <Text style={{ fontSize: 14, color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }}>
               {getLabel("Envoyer une notification test", "Send test notification", "إرسال إشعار تجريبي")}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+            <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
           </TouchableOpacity>
         </View>
-        {/* ── fin Phase 16 ── */}
+        {/* ── fin Notifications ── */}
 
-        {/* ── Phase 19 : Section Historiques ── */}
+        {/* ── Section Historiques ── */}
         <View style={{
           backgroundColor: "#FFFFFF", borderRadius: 14,
           borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, overflow: "hidden",
         }}>
           <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
-              {currentLanguage === "ar" ? "السجل والمحفوظات"
-                : currentLanguage === "en" ? "HISTORY & SAVED"
-                : "HISTORIQUE & SAUVEGARDES"}
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5, textAlign: isRTL ? "right" : "left" }}>
+              {historyLabels.title}
             </Text>
           </View>
-          {[
-            { type: "quizzes" as HistoryType,      label: "Quiz",          icon: "🧠" },
-            { type: "flashcards" as HistoryType,   label: "Flashcards",    icon: "🃏" },
-            { type: "plans" as HistoryType,        label: "Plans d'étude", icon: "📅" },
-            { type: "summaries" as HistoryType,    label: "Résumés",       icon: "📄" },
-            { type: "explanations" as HistoryType, label: "Explications",  icon: "💡" },
-            { type: "solutions" as HistoryType,    label: "Solutions",     icon: "✏️" },
-            { type: "chatSessions" as HistoryType, label: "Chat IA",       icon: "💬" },
-          ].map(({ type, label, icon }, index, arr) => (
-            <View
-              key={type}
-              style={{
-                flexDirection: "row", alignItems: "center", padding: 14,
-                borderBottomWidth: index < arr.length - 1 ? 1 : 0,
-                borderBottomColor: "#F3F4F6",
-              }}
-            >
-              <View style={{
-                width: 36, height: 36, borderRadius: 10,
-                backgroundColor: "#FEF2F2", alignItems: "center", justifyContent: "center",
-                marginRight: 12,
-              }}>
-                <Text style={{ fontSize: 16 }}>{icon}</Text>
-              </View>
-              <Text style={{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "500" }}>
-                {label}
-              </Text>
-              <TouchableOpacity
-                onPress={() => confirmDeleteAll(type, label, currentLanguage, () => triggerRefresh(type))}
+          {HISTORY_ITEMS.map(({ type, labelFr, labelEn, labelAr, icon }, index, arr) => {
+            const label = getLabel(labelFr, labelEn, labelAr);
+            return (
+              <View
+                key={type}
                 style={{
-                  backgroundColor: "#FEF2F2", paddingHorizontal: 10, paddingVertical: 6,
-                  borderRadius: 8, borderWidth: 1, borderColor: "#FECACA",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center", padding: 14,
+                  borderBottomWidth: index < arr.length - 1 ? 1 : 0,
+                  borderBottomColor: "#F3F4F6",
                 }}
               >
-                <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
-                  {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+                <View style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  backgroundColor: "#FEF2F2", alignItems: "center", justifyContent: "center",
+                  marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+                }}>
+                  <Text style={{ fontSize: 16 }}>{icon}</Text>
+                </View>
+                <Text style={{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+                  {label}
                 </Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+                <TouchableOpacity
+                  onPress={() => confirmDeleteAll(type, label, currentLanguage, () => triggerRefresh(type))}
+                  style={{
+                    backgroundColor: "#FEF2F2", paddingHorizontal: 10, paddingVertical: 6,
+                    borderRadius: 8, borderWidth: 1, borderColor: "#FECACA",
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                    {historyLabels.clearAll}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
         </View>
-        {/* ── fin Phase 19 ── */}
+        {/* ── fin Historiques ── */}
 
         {/* Logout */}
         <TouchableOpacity
           onPress={handleLogout}
           style={{
             backgroundColor: "#FEF2F2", borderRadius: 14, padding: 16,
-            flexDirection: "row", alignItems: "center", justifyContent: "center",
-            borderWidth: 1, borderColor: "#FECACA",
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", justifyContent: "center",
+            borderWidth: 1, borderColor: "#FECACA", marginBottom: 12,
           }}
         >
           <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-          <Text style={{ fontSize: 15, fontWeight: "600", color: "#EF4444", marginLeft: 8 }}>
+          <Text style={{ fontSize: 15, fontWeight: "600", color: "#EF4444", marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }}>
             {t("logout")}
           </Text>
         </TouchableOpacity>
 
-          {/* ── Suppression compte ── */}
-<TouchableOpacity
-  onPress={handleDeleteAccount}
-  disabled={deletingAccount}
-  style={{
-    borderRadius: 14, padding: 16, marginTop: 12,
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: "#FECACA",
-    opacity: deletingAccount ? 0.6 : 1,
-  }}
->
-  {deletingAccount ? (
-    <ActivityIndicator size="small" color="#EF4444" />
-  ) : (
-    <>
-      <Ionicons name="trash-outline" size={18} color="#EF4444" />
-      <Text style={{ fontSize: 14, fontWeight: "600", color: "#EF4444", marginLeft: 8 }}>
-        {currentLanguage === "ar" ? "حذف الحساب نهائياً"
-          : currentLanguage === "en" ? "Delete my account"
-          : "Supprimer mon compte"}
-      </Text>
-    </>
-  )}
-</TouchableOpacity>
+        {/* Suppression compte */}
+        <TouchableOpacity
+          onPress={handleDeleteAccount}
+          disabled={deletingAccount}
+          style={{
+            borderRadius: 14, padding: 16,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", justifyContent: "center",
+            borderWidth: 1, borderColor: "#FECACA",
+            opacity: deletingAccount ? 0.6 : 1,
+          }}
+        >
+          {deletingAccount ? (
+            <ActivityIndicator size="small" color="#EF4444" />
+          ) : (
+            <>
+              <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              <Text style={{ fontSize: 14, fontWeight: "600", color: "#EF4444", marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }}>
+                {deleteLabels.btn}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
 
       </ScrollView>
 
@@ -473,9 +493,7 @@ const confirmDeleteAccount = async () => {
           display={Platform.OS === "ios" ? "spinner" : "default"}
           onChange={(_, date) => {
             setShowTimePicker(false);
-            if (date) {
-              setReminderTime(date.getHours(), date.getMinutes(), currentLanguage);
-            }
+            if (date) setReminderTime(date.getHours(), date.getMinutes(), currentLanguage);
           }}
         />
       )}
@@ -496,7 +514,7 @@ const confirmDeleteAccount = async () => {
             backgroundColor: "#FFFFFF", borderTopLeftRadius: 20,
             borderTopRightRadius: 20, padding: 24, paddingBottom: 40,
           }}>
-            <Text style={{ fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 20, textAlign: isRTL ? "right" : "left" }}>
               {t("select_language")}
             </Text>
             {LANGUAGES.map((lang) => (
@@ -504,19 +522,22 @@ const confirmDeleteAccount = async () => {
                 key={lang.code}
                 onPress={() => handleLanguageChange(lang.code)}
                 style={{
-                  flexDirection: "row", alignItems: "center", padding: 16,
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center", padding: 16,
                   borderRadius: 12, marginBottom: 8,
                   backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "#F8F9FA",
                   borderWidth: 1.5,
                   borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
                 }}
               >
-                <Text style={{ fontSize: 28, marginRight: 14 }}>{lang.flag}</Text>
+                <Text style={{ fontSize: 28, marginRight: isRTL ? 0 : 14, marginLeft: isRTL ? 14 : 0 }}>
+                  {lang.flag}
+                </Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#111827" }}>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
                     {lang.nativeLabel}
                   </Text>
-                  <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+                  <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2, textAlign: isRTL ? "right" : "left" }}>
                     {lang.label}
                   </Text>
                 </View>
