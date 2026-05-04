@@ -9,7 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import {
-  collection, addDoc, Timestamp, getFirestore,
+  collection, addDoc, deleteDoc, doc as fsDoc, Timestamp, getFirestore,
   getDocs, query, where, orderBy, limit, startAfter,
   QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -23,6 +23,7 @@ import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { useDeleteHistory } from "../hooks/useDeleteHistory";
 import { ImportTextButton } from "../components/ImportTextButton"; // ← AJOUT
 
 const CACHE_KEY = "studyai_summaries";
@@ -48,6 +49,7 @@ export default function SummaryScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { checkAndConsume } = useAIRequest();
+  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("summary"); // ← AJOUT Phase 17
 
   const [inputText, setInputText] = useState("");
@@ -450,14 +452,20 @@ export default function SummaryScreen() {
         {/* Historique */}
         {cachedSummaries.length > 0 && summary === "" && (
           <View style={{ marginTop: 8 }}>
-            <Text style={{
-              fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
-              textAlign: isRTL ? "right" : "left",
-            }}>
-              🕒 {currentLanguage === "ar" ? "الملخصات المحفوظة"
-                : currentLanguage === "en" ? "Saved Summaries"
-                : "Résumés sauvegardés"}
-            </Text>
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
+                    🕒 {currentLanguage === "ar" ? "الملخصات المحفوظة"
+                      : currentLanguage === "en" ? "Saved Summaries"
+                      : "Résumés sauvegardés"}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteAll("summaries", "Résumés", currentLanguage, () => setCachedSummaries([]))}
+                  >
+                    <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                      {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
             {cachedSummaries.slice(0, displayCount).map((item) => (
               <TouchableOpacity
@@ -478,15 +486,28 @@ export default function SummaryScreen() {
                 >
                   {item.summary}
                 </Text>
-                <Text style={{
-                  fontSize: 11, color: "#9CA3AF", marginTop: 6,
-                  textAlign: isRTL ? "right" : "left",
-                }}>
-                  {new Date(item.createdAt).toLocaleDateString(
-                    currentLanguage === "ar" ? "ar-SA"
-                    : currentLanguage === "en" ? "en-GB" : "fr-FR"
-                  )}
-                </Text>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                  <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                    {new Date(item.createdAt).toLocaleDateString(
+                      currentLanguage === "ar" ? "ar-SA"
+                      : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                    )}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteOne(
+                      "summaries", item.id, item.summary?.slice(0, 30) || "résumé", currentLanguage,
+                      () => setCachedSummaries((prev: any[]) => prev.filter((x) => x.id !== item.id)),
+                      async () => {
+                        const user = auth.currentUser;
+                        if (!user) return;
+                        const updated = cachedSummaries.filter((x: any) => x.id !== item.id);
+                        await AsyncStorage.setItem(`${CACHE_KEY}_${user.uid}`, JSON.stringify({ data: updated, timestamp: Date.now() }));
+                      }
+                    )}
+                  >
+                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
             ))}
 

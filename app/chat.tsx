@@ -9,8 +9,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import {
+  getFirestore, collection, getDocs, query, where,
+  orderBy, limit, deleteDoc, doc,
+} from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useChatStore } from "../store/chatStore";
 import { ChatMessage } from "../types/chat";
 import { useTranslation } from "react-i18next";
@@ -19,6 +24,10 @@ import { useAIRequest } from "../hooks/useAIRequest";
 import { UsageBanner } from "../components/UsageBanner";
 import { limitInput } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { useDeleteHistory } from "../hooks/useDeleteHistory";
+
+const CACHE_KEY = "studyai_chatSessions";
+const PAGE_SIZE = 5;
 
 const COURSES_FR = [
   "Mathématiques", "Physique", "Chimie",
@@ -37,6 +46,15 @@ const COURSES_AR = [
   "التاريخ", "الجغرافيا", "الأحياء",
   "الإعلام الآلي", "الأدب", "الفلسفة", "الإنجليزية",
 ];
+
+interface CachedChatSession {
+  id: string;
+  userId: string;
+  courseName: string;
+  messages: { role: string; content: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 function MessageText({
   content, color, isRTL,
@@ -82,6 +100,9 @@ export default function ChatScreen() {
     : currentLanguage === "en" ? COURSES_EN
     : COURSES_FR;
 
+  const db = getFirestore(app);
+  const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
+
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -89,8 +110,58 @@ export default function ChatScreen() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
+  // ── Historique sessions ──
+  const [cachedSessions, setCachedSessions] = useState<CachedChatSession[]>([]);
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   useEffect(() => {
-    trackView(); // ← AJOUT Phase 17
+    trackView();
+
+    const loadCache = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data } = JSON.parse(raw);
+          if (data?.length > 0) {
+            setCachedSessions(data);
+            setHasMore(data.length >= PAGE_SIZE);
+          }
+        }
+
+        const q = query(
+          collection(db, "chatSessions"),
+          where("userId", "==", user.uid),
+          orderBy("updatedAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+
+        const fromFirestore: CachedChatSession[] = snap.docs.map((d) => ({
+          id: d.id,
+          userId: d.data().userId,
+          courseName: d.data().courseName || "",
+          messages: d.data().messages || [],
+          createdAt: d.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updatedAt: d.data().updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedSessions(fromFirestore);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Chat history load error:", e);
+      }
+    };
+    loadCache();
   }, []);
 
   useEffect(() => {
@@ -126,6 +197,51 @@ export default function ChatScreen() {
     return "Je n'ai pas pu générer une réponse.";
   };
 
+  const handleLoadMoreSessions = async () => {
+    const user = auth.currentUser;
+    if (!user || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, "chatSessions"),
+        where("userId", "==", user.uid),
+        orderBy("updatedAt", "desc"),
+        limit(PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      const more: CachedChatSession[] = snap.docs
+        .filter((d) => !cachedSessions.find((s) => s.id === d.id))
+        .map((d) => ({
+          id: d.id,
+          userId: d.data().userId,
+          courseName: d.data().courseName || "",
+          messages: d.data().messages || [],
+          createdAt: d.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+          updatedAt: d.data().updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+      const updated = [...cachedSessions, ...more];
+      setCachedSessions(updated);
+      setHasMore(more.length === PAGE_SIZE);
+    } catch (e) {
+      console.log("Load more sessions error:", e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleResumeSession = (session: CachedChatSession) => {
+    setSelectedCourse(session.courseName);
+    setSessionId(session.id);
+    setMessages(
+      session.messages.map((m, i) => ({
+        id: i.toString(),
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        timestamp: session.updatedAt,
+      }))
+    );
+  };
+
   const handleSelectCourse = async (course: string) => {
     setSelectedCourse(course);
     setMessages([{
@@ -142,6 +258,33 @@ export default function ChatScreen() {
       }
     } catch (e) {
       console.log("Session creation error:", e);
+    }
+  };
+
+  const updateSessionCache = async (sid: string, finalMessages: ChatMessage[]) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const updatedSessions = cachedSessions.map((s) =>
+        s.id === sid ? { ...s, messages: finalMessages, updatedAt: new Date().toISOString() } : s
+      );
+      if (!updatedSessions.find((s) => s.id === sid)) {
+        updatedSessions.unshift({
+          id: sid,
+          userId: user.uid,
+          courseName: selectedCourse || "",
+          messages: finalMessages,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      setCachedSessions(updatedSessions.slice(0, 10));
+      await AsyncStorage.setItem(
+        `${CACHE_KEY}_${user.uid}`,
+        JSON.stringify({ data: updatedSessions.slice(0, 10), timestamp: Date.now() })
+      );
+    } catch (e) {
+      console.log("updateSessionCache error:", e);
     }
   };
 
@@ -206,6 +349,7 @@ export default function ChatScreen() {
       if (sessionId) {
         await addMessage(sessionId, userMessage);
         await addMessage(sessionId, assistantMessage);
+        await updateSessionCache(sessionId, finalMessages);
       }
     } catch (e: any) {
       endTracking(false); // ← AJOUT Phase 17 — échec
@@ -285,6 +429,97 @@ export default function ChatScreen() {
           </View>
 
           {/* Liste des cours */}
+          {/* ── Historique sessions chat ── */}
+          {cachedSessions.length > 0 && (
+            <View style={{ marginBottom: 28 }}>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
+                  🕒 {currentLanguage === "ar" ? "المحادثات السابقة"
+                    : currentLanguage === "en" ? "Previous Chats"
+                    : "Conversations récentes"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => confirmDeleteAll("chatSessions", "Chat", currentLanguage, () => setCachedSessions([]))}
+                >
+                  <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                    {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {cachedSessions.slice(0, displayCount).map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  onPress={() => handleResumeSession(item)}
+                  style={{
+                    backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
+                    marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB",
+                    elevation: 1,
+                  }}
+                >
+                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", flex: 1, gap: 8 }}>
+                      <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" }}>
+                        <Ionicons name="school" size={16} color="#6366F1" />
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }} numberOfLines={1}>
+                        {item.courseName}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => confirmDeleteOne(
+                        "chatSessions", item.id, item.courseName, currentLanguage,
+                        () => setCachedSessions((prev) => prev.filter((s) => s.id !== item.id)),
+                        async () => {
+                          const user = auth.currentUser;
+                          if (!user) return;
+                          const updated = cachedSessions.filter((s) => s.id !== item.id);
+                          await AsyncStorage.setItem(`${CACHE_KEY}_${user.uid}`, JSON.stringify({ data: updated, timestamp: Date.now() }));
+                        }
+                      )}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                    <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                      {new Date(item.updatedAt).toLocaleDateString(
+                        currentLanguage === "ar" ? "ar-SA" : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                      )}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <View style={{ backgroundColor: "#EEF2FF", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 11, color: "#6366F1", fontWeight: "600" }}>
+                          {item.messages.length} {currentLanguage === "ar" ? "رسالة" : currentLanguage === "en" ? "msgs" : "msgs"}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={12} color="#9CA3AF" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+              {hasMore && (
+                <TouchableOpacity
+                  onPress={handleLoadMoreSessions}
+                  disabled={loadingMore}
+                  style={{ borderRadius: 12, padding: 14, alignItems: "center", backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB", marginTop: 4 }}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color="#6366F1" />
+                  ) : (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="chevron-down" size={16} color="#6366F1" />
+                      <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 14 }}>
+                        {currentLanguage === "ar" ? "عرض المزيد" : currentLanguage === "en" ? "Load more" : "Voir plus"}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          {/* ── fin Historique ── */}
+
           <Text style={{
             fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 14,
             textAlign: isRTL ? "right" : "left",

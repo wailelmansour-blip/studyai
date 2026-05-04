@@ -23,7 +23,8 @@ import { useAIRequest } from "../hooks/useAIRequest";
 import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
-import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { useAnalytics } from "../hooks/useAnalytics";
+import { useDeleteHistory } from "../hooks/useDeleteHistory"; // ← AJOUT Phase 17
 import { ImportTextButton } from "../components/ImportTextButton";
 
 const CACHE_KEY = "studyai_explanations";
@@ -543,14 +544,20 @@ export default function ExplainScreen() {
         {/* Historique explications */}
         {cachedExplanations.length > 0 && !result && (
           <View style={{ marginTop: 24 }}>
-            <Text style={{
-              fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
-              textAlign: isRTL ? "right" : "left",
-            }}>
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
               🕒 {currentLanguage === "ar" ? "الشروحات المحفوظة"
                 : currentLanguage === "en" ? "Saved Explanations"
                 : "Explications sauvegardées"}
             </Text>
+            <TouchableOpacity
+              onPress={() => confirmDeleteAll("explanations", "Explications sauvegardées", currentLanguage, () => setCachedExplanations([]))}
+            >
+              <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+              </Text>
+            </TouchableOpacity>
+          </View>
             {cachedExplanations.slice(0, displayCount).map((item) => (
               <TouchableOpacity
                 key={item.id}
@@ -588,6 +595,20 @@ export default function ExplainScreen() {
                       {difficultyLabels[item.difficulty as keyof typeof difficultyLabels]}
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteOne(
+                      "explanations", item.id, item.explanation?.slice(0,30) || "explication", currentLanguage,
+                      () => setCachedExplanations((prev: any[]) => prev.filter((x) => x.id !== item.id)),
+                      async () => {
+                        const user = auth.currentUser;
+                        if (!user) return;
+                        const updated = cachedExplanations.filter((x: any) => x.id !== item.id);
+                        await AsyncStorage.setItem(`studyai_explanations_${user.uid}`, JSON.stringify({ data: updated, timestamp: Date.now() }));
+                      }
+                    )}
+                  >
+                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             ))}

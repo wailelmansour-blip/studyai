@@ -23,6 +23,7 @@ import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics";
+import { useDeleteHistory } from "../hooks/useDeleteHistory";
 
 const CACHE_KEY = "studyai_quizzes"; // ← AJOUT
 const CACHE_TTL = 24 * 60 * 60 * 1000; // ← AJOUT
@@ -440,14 +441,23 @@ export default function QuizScreen() {
             {/* ── Historique quizzes ── ← AJOUT */}
             {cachedQuizzes.length > 0 && (
               <View style={{ marginTop: 28 }}>
-                <Text style={{
-                  fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
-                  textAlign: isRTL ? "right" : "left",
-                }}>
-                  🕒 {currentLanguage === "ar" ? "الاختبارات السابقة"
-                    : currentLanguage === "en" ? "Previous Quizzes"
-                    : "Quiz précédents"}
-                </Text>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <Text style={{
+                    fontSize: 15, fontWeight: "700", color: "#111827",
+                    textAlign: isRTL ? "right" : "left",
+                  }}>
+                    🕒 {currentLanguage === "ar" ? "الاختبارات السابقة"
+                      : currentLanguage === "en" ? "Previous Quizzes"
+                      : "Quiz précédents"}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteAll("quizzes", currentLanguage === "ar" ? "Quiz" : "Quiz", currentLanguage, () => setCachedQuizzes([]))}
+                  >
+                    <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                      {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 {cachedQuizzes.slice(0, displayCount).map((item) => (
                   <TouchableOpacity
                     key={item.id}
@@ -496,16 +506,29 @@ export default function QuizScreen() {
                           : currentLanguage === "en" ? "en-GB" : "fr-FR"
                         )}
                       </Text>
-                      <View style={{
-                        flexDirection: isRTL ? "row-reverse" : "row",
-                        alignItems: "center", gap: 4,
-                      }}>
-                        <Ionicons name="refresh-outline" size={12} color="#6366F1" />
-                        <Text style={{ fontSize: 11, color: "#6366F1", fontWeight: "600" }}>
-                          {currentLanguage === "ar" ? "إعادة"
-                            : currentLanguage === "en" ? "Replay"
-                            : "Rejouer"}
-                        </Text>
+                      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 12 }}>
+                        <TouchableOpacity
+                          onPress={() => confirmDeleteOne(
+                            "quizzes", item.id, item.topic, currentLanguage,
+                            () => setCachedQuizzes((prev) => prev.filter((q) => q.id !== item.id)),
+                            async () => {
+                              const user = auth.currentUser;
+                              if (!user) return;
+                              const updated = cachedQuizzes.filter((q) => q.id !== item.id);
+                              await AsyncStorage.setItem(`${CACHE_KEY}_${user.uid}`, JSON.stringify({ data: updated, timestamp: Date.now() }));
+                            }
+                          )}
+                        >
+                          <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                        </TouchableOpacity>
+                        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4 }}>
+                          <Ionicons name="refresh-outline" size={12} color="#6366F1" />
+                          <Text style={{ fontSize: 11, color: "#6366F1", fontWeight: "600" }}>
+                            {currentLanguage === "ar" ? "إعادة"
+                              : currentLanguage === "en" ? "Replay"
+                              : "Rejouer"}
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   </TouchableOpacity>

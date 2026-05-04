@@ -26,6 +26,7 @@ import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
 import { schedulePlanAlert } from "../services/notifications";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { useDeleteHistory } from "../hooks/useDeleteHistory";
 
 const CACHE_KEY = "studyai_plans";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -592,14 +593,20 @@ export default function PlanScreen() {
             {/* Historique plans */}
             {cachedPlans.length > 0 && (
               <View style={{ marginTop: 28 }}>
-                <Text style={{
-                  fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
-                  textAlign: isRTL ? "right" : "left",
-                }}>
-                  🕒 {currentLanguage === "ar" ? "خطط الدراسة المحفوظة"
-                    : currentLanguage === "en" ? "Saved Study Plans"
-                    : "Plans d'étude sauvegardés"}
-                </Text>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
+                    🕒 {currentLanguage === "ar" ? "خطط الدراسة المحفوظة"
+                      : currentLanguage === "en" ? "Saved Study Plans"
+                      : "Plans d'étude sauvegardés"}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteAll("plans", "Plans", currentLanguage, () => setCachedPlans([]))}
+                  >
+                    <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                      {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 {cachedPlans.slice(0, displayCount).map((item) => (
                   <TouchableOpacity
                     key={item.id}
@@ -624,15 +631,28 @@ export default function PlanScreen() {
                     }}>
                       {item.subjects.join(", ")}
                     </Text>
-                    <Text style={{
-                      fontSize: 11, color: "#9CA3AF", marginTop: 4,
-                      textAlign: isRTL ? "right" : "left",
-                    }}>
-                      {new Date(item.createdAt).toLocaleDateString(
-                        currentLanguage === "ar" ? "ar-SA"
-                        : currentLanguage === "en" ? "en-GB" : "fr-FR"
-                      )}
-                    </Text>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                      <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                        {new Date(item.createdAt).toLocaleDateString(
+                          currentLanguage === "ar" ? "ar-SA"
+                          : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                        )}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => confirmDeleteOne(
+                          "plans", item.id, item.title, currentLanguage,
+                          () => setCachedPlans((prev) => prev.filter((p) => p.id !== item.id)),
+                          async () => {
+                            const user = auth.currentUser;
+                            if (!user) return;
+                            const updated = cachedPlans.filter((p) => p.id !== item.id);
+                            await AsyncStorage.setItem(`${CACHE_KEY}_${user.uid}`, JSON.stringify({ data: updated, timestamp: Date.now() }));
+                          }
+                        )}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
                   </TouchableOpacity>
                 ))}
 

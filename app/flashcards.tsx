@@ -24,6 +24,7 @@ import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { useDeleteHistory } from "../hooks/useDeleteHistory";
 
 const CACHE_KEY = "studyai_flashcards";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -398,14 +399,20 @@ export default function FlashcardsScreen() {
             {/* Historique flashcards */}
             {cachedFlashcards.length > 0 && (
               <View style={{ marginTop: 28 }}>
-                <Text style={{
-                  fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
-                  textAlign: isRTL ? "right" : "left",
-                }}>
-                  🕒 {currentLanguage === "ar" ? "البطاقات المحفوظة"
-                    : currentLanguage === "en" ? "Saved Flashcards"
-                    : "Flashcards sauvegardées"}
-                </Text>
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
+                    🕒 {currentLanguage === "ar" ? "البطاقات المحفوظة"
+                      : currentLanguage === "en" ? "Saved Flashcards"
+                      : "Flashcards sauvegardées"}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteAll("flashcards", "Flashcards", currentLanguage, () => setCachedFlashcards([]))}
+                  >
+                    <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                      {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 {cachedFlashcards.slice(0, displayCount).map((item) => (
                   <TouchableOpacity
                     key={item.id}
@@ -438,15 +445,28 @@ export default function FlashcardsScreen() {
                         </Text>
                       </View>
                     </View>
-                    <Text style={{
-                      fontSize: 11, color: "#9CA3AF", marginTop: 6,
-                      textAlign: isRTL ? "right" : "left",
-                    }}>
-                      {new Date(item.createdAt).toLocaleDateString(
-                        currentLanguage === "ar" ? "ar-SA"
-                        : currentLanguage === "en" ? "en-GB" : "fr-FR"
-                      )}
-                    </Text>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                      <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                        {new Date(item.createdAt).toLocaleDateString(
+                          currentLanguage === "ar" ? "ar-SA"
+                          : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                        )}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => confirmDeleteOne(
+                          "flashcards", item.id, item.topic, currentLanguage,
+                          () => setCachedFlashcards((prev) => prev.filter((f) => f.id !== item.id)),
+                          async () => {
+                            const user = auth.currentUser;
+                            if (!user) return;
+                            const updated = cachedFlashcards.filter((f) => f.id !== item.id);
+                            await AsyncStorage.setItem(`${CACHE_KEY}_${user.uid}`, JSON.stringify({ data: updated, timestamp: Date.now() }));
+                          }
+                        )}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
                   </TouchableOpacity>
                 ))}
 

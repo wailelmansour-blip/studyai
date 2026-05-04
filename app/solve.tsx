@@ -23,7 +23,8 @@ import { useAIRequest } from "../hooks/useAIRequest";
 import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
-import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
+import { useAnalytics } from "../hooks/useAnalytics";
+import { useDeleteHistory } from "../hooks/useDeleteHistory"; // ← AJOUT Phase 17
 import { ImportTextButton } from "../components/ImportTextButton";
 
 const CACHE_KEY = "studyai_solutions";
@@ -540,14 +541,20 @@ export default function SolveScreen() {
         {/* Historique solutions */}
         {cachedSolutions.length > 0 && !result && (
           <View style={{ marginTop: 24 }}>
-            <Text style={{
-              fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12,
-              textAlign: isRTL ? "right" : "left",
-            }}>
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
               🕒 {currentLanguage === "ar" ? "الحلول المحفوظة"
                 : currentLanguage === "en" ? "Saved Solutions"
                 : "Solutions sauvegardées"}
             </Text>
+            <TouchableOpacity
+              onPress={() => confirmDeleteAll("solutions", "Solutions sauvegardées", currentLanguage, () => setCachedSolutions([]))}
+            >
+              <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+              </Text>
+            </TouchableOpacity>
+          </View>
             {cachedSolutions.slice(0, displayCount).map((item) => (
               <TouchableOpacity
                 key={item.id}
@@ -587,6 +594,20 @@ export default function SolveScreen() {
                       </Text>
                     </View>
                   ) : null}
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteOne(
+                      "solutions", item.id, item.exercise?.slice(0,30) || "solution", currentLanguage,
+                      () => setCachedSolutions((prev: any[]) => prev.filter((x) => x.id !== item.id)),
+                      async () => {
+                        const user = auth.currentUser;
+                        if (!user) return;
+                        const updated = cachedSolutions.filter((x: any) => x.id !== item.id);
+                        await AsyncStorage.setItem(`studyai_solutions_${user.uid}`, JSON.stringify({ data: updated, timestamp: Date.now() }));
+                      }
+                    )}
+                  >
+                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             ))}
