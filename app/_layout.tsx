@@ -22,7 +22,7 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && user.emailVerified) {
       loadUsage();
       loadSettings(currentLanguage);
       trackConversion("signup").catch(() => {}); // ← AJOUT Phase 17
@@ -30,14 +30,21 @@ export default function RootLayout() {
   }, [user]);
 
   useEffect(() => {
-    if (!isInitialized) return;
-    const inAuthGroup = segments[0] === "(auth)";
-    if (!user && !inAuthGroup) {
-      router.replace("/(auth)/login");
-    } else if (user && inAuthGroup) {
+  if (!isInitialized) return;
+  const inAuthGroup = segments[0] === "(auth)";
+  if (!user && !inAuthGroup) {
+    router.replace("/(auth)/login");
+  } else if (user && inAuthGroup) {
+    // Ne rediriger que si email vérifié
+    if (user.emailVerified) {
       router.replace("/(tabs)/home");
+    } else {
+      // Déconnecter si email non vérifié
+      const { logout } = useAuthStore.getState();
+      logout();
     }
-  }, [user, isInitialized, segments]);
+  }
+}, [user, isInitialized, segments]);
 
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(() => {
