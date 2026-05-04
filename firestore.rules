@@ -17,9 +17,7 @@ service cloud.firestore {
     // ── users/{userId} ───────────────────────────────────────────
     match /users/{userId} {
       allow read: if isOwner(userId);
-      allow create: if isOwner(userId)
-        && isValidString(request.resource.data.name, 100)
-        && isValidString(request.resource.data.email, 200);
+      allow create: if isOwner(userId);
       allow update: if isOwner(userId);
       allow delete: if false;
 
@@ -115,42 +113,50 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
     }
 
-    // ── analytics_ai_calls ───────────────────────────────────────────
-match /analytics_ai_calls/{docId} {
-  allow create: if isAuthenticated()
-    && request.resource.data.userId == request.auth.uid;
-  allow read: if false;
-  allow update: if false;
-  allow delete: if false;
-}
+    // ── deleted_users ────────────────────────────────────────────
+    match /deleted_users/{docId} {
+      allow read: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
 
-// ── analytics_daily ──────────────────────────────────────────────
-match /analytics_daily/{docId} {
-  allow read: if isAuthenticated()
-    && resource.data.userId == request.auth.uid;
-  allow create: if isAuthenticated()
-    && request.resource.data.userId == request.auth.uid;
-  allow update: if isAuthenticated()
-    && resource.data.userId == request.auth.uid;
-  allow delete: if false;
-}
+    // ── analytics_ai_calls ───────────────────────────────────────
+    match /analytics_ai_calls/{docId} {
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow read: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
 
-// ── analytics_conversions ────────────────────────────────────────
-match /analytics_conversions/{docId} {
-  allow create: if isAuthenticated()
-    && request.resource.data.userId == request.auth.uid;
-  allow read: if false;
-  allow update: if false;
-  allow delete: if false;
-}
+    // ── analytics_daily ──────────────────────────────────────────
+    match /analytics_daily/{docId} {
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
 
-// ── analytics_screens ────────────────────────────────────────────
-match /analytics_screens/{docId} {
-  allow create: if isAuthenticated()
-    && request.resource.data.userId == request.auth.uid;
-  allow read: if false;
-  allow update: if false;
-  allow delete: if false;
-}
+    // ── analytics_conversions ────────────────────────────────────
+    match /analytics_conversions/{docId} {
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow read: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── analytics_screens ────────────────────────────────────────
+    match /analytics_screens/{docId} {
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow read: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
   }
 }
