@@ -34,7 +34,6 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
 
   const strength = getPasswordStrength(password);
 
@@ -68,7 +67,10 @@ export default function SignupScreen() {
         lastName.trim(),
         birthDate.toISOString().split("T")[0]
       );
-      setEmailSent(true);
+      router.replace({
+  pathname: "/(auth)/login",
+  params: { email: email.trim(), justRegistered: "true" },
+});
     } catch (e: any) {
       if (e.code === "auth/email-already-in-use") {
         Alert.alert("Compte existant", "Un compte existe déjà avec cet email. Connecte-toi.");
@@ -78,79 +80,7 @@ export default function SignupScreen() {
     }
   };
 
-  // ── Écran confirmation email envoyé ──
-  if (emailSent) {
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center" }}>
-        <View style={{ alignItems: "center", marginBottom: 32 }}>
-          <View style={{
-            width: 80, height: 80, borderRadius: 40,
-            backgroundColor: "#EEF2FF", alignItems: "center",
-            justifyContent: "center", marginBottom: 20,
-          }}>
-            <Ionicons name="mail-outline" size={40} color="#6366F1" />
-          </View>
-          <Text style={{ fontSize: 24, fontWeight: "700", color: "#111827", textAlign: "center" }}>
-            Inscription réussie ! 🎉
-          </Text>
-          <Text style={{ fontSize: 15, color: "#6B7280", marginTop: 12, textAlign: "center", lineHeight: 22 }}>
-            Un email de vérification a été envoyé à{"\n"}
-            <Text style={{ fontWeight: "600", color: "#374151" }}>{email}</Text>
-          </Text>
-        </View>
-
-        {/* Message spam */}
-        <View style={{
-          backgroundColor: "#FFFBEB", borderRadius: 12, padding: 14,
-          marginBottom: 24, borderWidth: 1, borderColor: "#FCD34D",
-        }}>
-          <Text style={{ fontSize: 13, color: "#92400E", lineHeight: 20 }}>
-            📬 Vérifie aussi ton dossier <Text style={{ fontWeight: "700" }}>Spam</Text> ou <Text style={{ fontWeight: "700" }}>Courrier indésirable</Text> si tu ne reçois pas l'email dans les 2 minutes.
-          </Text>
-        </View>
-
-        {/* Étapes */}
-        <View style={{
-          backgroundColor: "#FFFFFF", borderRadius: 12, padding: 16,
-          marginBottom: 24, borderWidth: 1, borderColor: "#E5E7EB",
-        }}>
-          <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 12 }}>
-            Comment activer ton compte :
-          </Text>
-          {[
-            "1. Ouvre l'email reçu",
-            "2. Clique sur le lien de vérification",
-            "3. Reviens ici et connecte-toi",
-          ].map((step, i) => (
-            <Text key={i} style={{ fontSize: 13, color: "#374151", marginBottom: 6, lineHeight: 20 }}>
-              {step}
-            </Text>
-          ))}
-        </View>
-
-        <TouchableOpacity
-          onPress={() => router.replace("/(auth)/login")}
-          style={{
-            backgroundColor: "#6366F1", borderRadius: 14,
-            padding: 16, alignItems: "center", marginBottom: 12,
-          }}
-        >
-          <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
-            Aller à la connexion
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={{ alignItems: "center", padding: 8 }}
-        >
-          <Text style={{ fontSize: 14, color: "#6B7280" }}>Retour</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
+  
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
