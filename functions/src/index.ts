@@ -14,6 +14,7 @@ import { chatAI } from "./chatAI";
 export { summarize, generateQuiz, generatePlan, chatAI };
 export { extractText } from "./extractText";
 export { deleteAccount } from "./deleteAccount";
+export { sendParentalConsent, approveParentalConsent } from "./parentalConsent";
 const openaiKey = defineSecret("OPENAI_API_KEY");
 
 // ── explainText ───────────────────────────────────────────

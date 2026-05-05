@@ -158,5 +158,10 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+
+    //--------parental autorisation--------------------------
+    match /parental_consents/{uid} {
+  allow read, write: if isOwner(uid);
+}
   }
 }
