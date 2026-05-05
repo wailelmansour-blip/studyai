@@ -144,31 +144,38 @@ export default function SignupScreen() {
   };
 
   const handleSendParentalConsent = async () => {
-    if (!parentEmail.trim() || !parentEmail.includes("@")) {
-      Alert.alert("", t.errParentEmail);
-      return;
-    }
-    if (!lastCreatedUid) {
-      Alert.alert("", t.errConsentFail);
-      return;
-    }
-    setSendingConsent(true);
-    try {
-      const fns = getFunctions(getApp(), "us-central1");
-      const fn = httpsCallable(fns, "sendParentalConsent");
-      await fn({
-        parentEmail: parentEmail.trim(),
-        childName: `${firstName} ${lastName}`,
-        language: currentLanguage,
-        uid: lastCreatedUid,
-      });
-      setConsentSent(true);
-    } catch (e: any) {
-      Alert.alert("", e.message || t.errConsentFail);
-    } finally {
-      setSendingConsent(false);
-    }
-  };
+  if (!parentEmail.trim() || !parentEmail.includes("@")) {
+    Alert.alert("", t.errParentEmail);
+    return;
+  }
+  if (!lastCreatedUid) {
+    Alert.alert("", t.errConsentFail);
+    return;
+  }
+  setSendingConsent(true);
+  try {
+    const response = await fetch(
+      "https://us-central1-studyai-ab88e.cloudfunctions.net/sendParentalConsent",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parentEmail: parentEmail.trim(),
+          childName: `${firstName} ${lastName}`,
+          language: currentLanguage,
+          uid: lastCreatedUid,
+        }),
+      }
+    );
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || t.errConsentFail);
+    setConsentSent(true);
+  } catch (e: any) {
+    Alert.alert("", e.message || t.errConsentFail);
+  } finally {
+    setSendingConsent(false);
+  }
+};
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>

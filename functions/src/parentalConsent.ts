@@ -1,4 +1,4 @@
-import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
@@ -7,59 +7,69 @@ import { Resend } from "resend";
 const resendKey = defineSecret("RESEND_API_KEY");
 
 // ── Envoyer email de consentement au parent ────────────────────────────────
-export const sendParentalConsent = onCall(
+export const sendParentalConsent = onRequest(
   { region: "us-central1", secrets: [resendKey], invoker: "public" },
-  async (request) => {
-    const { parentEmail, childName, language = "fr", uid } = request.data;
-
-    if (!uid) throw new HttpsError("invalid-argument", "UID manquant.");
-
-    if (!parentEmail || !parentEmail.includes("@")) {
-      throw new HttpsError("invalid-argument", "Email parent invalide.");
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
     }
 
-    const db = admin.firestore();
+    const { parentEmail, childName, language = "fr", uid } = req.body;
 
-    // Générer un token unique
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
+    if (!uid) {
+      res.status(400).json({ error: "UID manquant." });
+      return;
+    }
 
-    // Sauvegarder le token dans Firestore
-    await db.collection("parental_consents").doc(uid).set({
-      userId: uid,
-      parentEmail,
-      childName,
-      token,
-      status: "pending",
-      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    if (!parentEmail || !parentEmail.includes("@")) {
+      res.status(400).json({ error: "Email parent invalide." });
+      return;
+    }
 
-    // Mettre à jour le profil enfant
-    await db.collection("users").doc(uid).update({
-      parentEmail,
-      parentalConsentStatus: "pending",
-    });
+    try {
+      const db = admin.firestore();
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-    const approveUrl = `https://us-central1-studyai-ab88e.cloudfunctions.net/approveParentalConsent?token=${token}&uid=${uid}`;
-    const rejectUrl  = `https://us-central1-studyai-ab88e.cloudfunctions.net/approveParentalConsent?token=${token}&uid=${uid}&action=reject`;
+      await db.collection("parental_consents").doc(uid).set({
+        userId: uid,
+        parentEmail,
+        childName,
+        token,
+        status: "pending",
+        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
-    const subject =
-      language === "ar" ? "طلب موافقة ولي الأمر — StudyAI"
-      : language === "en" ? "Parental Consent Request — StudyAI"
-      : "Demande de consentement parental — StudyAI";
+      await db.collection("users").doc(uid).update({
+        parentEmail,
+        parentalConsentStatus: "pending",
+      });
 
-    const html = buildEmail(childName, approveUrl, rejectUrl, language);
+      const approveUrl = `https://us-central1-studyai-ab88e.cloudfunctions.net/approveParentalConsent?token=${token}&uid=${uid}`;
+      const rejectUrl  = `https://us-central1-studyai-ab88e.cloudfunctions.net/approveParentalConsent?token=${token}&uid=${uid}&action=reject`;
 
-    const resend = new Resend(resendKey.value());
-    await resend.emails.send({
-      from: "StudyAI <onboarding@resend.dev>",
-      to: parentEmail,
-      subject,
-      html,
-    });
+      const subject =
+        language === "ar" ? "طلب موافقة ولي الأمر — StudyAI"
+        : language === "en" ? "Parental Consent Request — StudyAI"
+        : "Demande de consentement parental — StudyAI";
 
-    return { success: true };
+      const html = buildEmail(childName, approveUrl, rejectUrl, language);
+
+      const resend = new Resend(resendKey.value());
+      await resend.emails.send({
+        from: "StudyAI <onboarding@resend.dev>",
+        to: parentEmail,
+        subject,
+        html,
+      });
+
+      res.status(200).json({ success: true });
+    } catch (e: any) {
+      console.error("sendParentalConsent error:", e);
+      res.status(500).json({ error: e.message || "Erreur interne." });
+    }
   }
 );
 
@@ -198,7 +208,7 @@ function buildEmail(childName: string, approveUrl: string, rejectUrl: string, la
 
             <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 32px;">${content.expiry}</p>
 
-            <!-- Approve Button -->
+            <!-- Buttons -->
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td align="center" style="padding-bottom:12px;">
