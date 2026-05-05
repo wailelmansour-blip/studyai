@@ -33,7 +33,7 @@ const getPasswordStrength = (pwd: string, lang: string): { label: string; color:
 };
 
 export default function SignupScreen() {
-  const { signup, isLoading, error, clearError } = useAuthStore();
+  const { signup, isLoading, error, clearError, lastCreatedUid } = useAuthStore();
   const { currentLanguage, setLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
 
@@ -58,38 +58,37 @@ export default function SignupScreen() {
   const currentLang = LANGUAGES.find((l) => l.code === currentLanguage);
 
   const t = {
-    title:            currentLanguage === "ar" ? "إنشاء حساب"                         : currentLanguage === "en" ? "Create account"               : "Créer un compte",
-    subtitle:         currentLanguage === "ar" ? "انضم إلى StudyAI مجاناً"             : currentLanguage === "en" ? "Join StudyAI for free"         : "Rejoins StudyAI gratuitement",
-    firstName:        currentLanguage === "ar" ? "الاسم الأول"                        : currentLanguage === "en" ? "First name"                   : "Prénom",
-    firstNamePH:      currentLanguage === "ar" ? "اسمك الأول"                         : currentLanguage === "en" ? "Your first name"               : "Ton prénom",
-    lastName:         currentLanguage === "ar" ? "اسم العائلة"                        : currentLanguage === "en" ? "Last name"                    : "Nom",
-    lastNamePH:       currentLanguage === "ar" ? "اسم عائلتك"                         : currentLanguage === "en" ? "Your last name"                : "Ton nom",
-    birthDate:        currentLanguage === "ar" ? "تاريخ الميلاد"                      : currentLanguage === "en" ? "Date of birth"                : "Date de naissance",
-    emailLabel:       currentLanguage === "ar" ? "البريد الإلكتروني"                  : "Email",
-    emailPH:          currentLanguage === "ar" ? "بريدك@example.com"                  : currentLanguage === "en" ? "your@email.com"                : "ton@email.com",
-    password:         currentLanguage === "ar" ? "كلمة المرور"                        : currentLanguage === "en" ? "Password"                     : "Mot de passe",
-    confirm:          currentLanguage === "ar" ? "تأكيد كلمة المرور"                  : currentLanguage === "en" ? "Confirm password"              : "Confirmer le mot de passe",
-    passwordMismatch: currentLanguage === "ar" ? "كلمتا المرور غير متطابقتين"         : currentLanguage === "en" ? "Passwords do not match"        : "Les mots de passe ne correspondent pas",
-    passwordStrength: currentLanguage === "ar" ? "قوة كلمة المرور"                    : currentLanguage === "en" ? "Password strength"             : "Mot de passe",
-    createBtn:        currentLanguage === "ar" ? "إنشاء حسابي"                        : currentLanguage === "en" ? "Create my account"             : "Créer mon compte",
-    alreadyAccount:   currentLanguage === "ar" ? "هل لديك حساب؟ "                    : currentLanguage === "en" ? "Already have an account? "     : "Déjà un compte ? ",
-    signIn:           currentLanguage === "ar" ? "تسجيل الدخول"                       : currentLanguage === "en" ? "Sign in"                      : "Se connecter",
-    errName:          currentLanguage === "ar" ? "الاسم الأول واسم العائلة مطلوبان."  : currentLanguage === "en" ? "First and last name required."  : "Prénom et nom requis.",
-    errEmail:         currentLanguage === "ar" ? "البريد الإلكتروني وكلمة المرور مطلوبان." : currentLanguage === "en" ? "Email and password required." : "Email et mot de passe requis.",
-    errMin:           currentLanguage === "ar" ? "6 أحرف على الأقل."                  : currentLanguage === "en" ? "Minimum 6 characters."         : "Minimum 6 caractères.",
-    errDuplicate:     currentLanguage === "ar" ? "يوجد حساب بهذا البريد. سجّل دخولك." : currentLanguage === "en" ? "Account already exists. Sign in." : "Un compte existe déjà. Connecte-toi.",
-    errFail:          currentLanguage === "ar" ? "فشل التسجيل. حاول مجدداً."         : currentLanguage === "en" ? "Registration failed. Try again."  : "Inscription échouée. Réessaie.",
-    selectLang:       currentLanguage === "ar" ? "اختر اللغة"                         : currentLanguage === "en" ? "Select language"               : "Choisir la langue",
-    // Parental consent
-    parentTitle:      currentLanguage === "ar" ? "⚠️ موافقة ولي الأمر مطلوبة"         : currentLanguage === "en" ? "⚠️ Parental consent required"    : "⚠️ Consentement parental requis",
+    title:            currentLanguage === "ar" ? "إنشاء حساب"                              : currentLanguage === "en" ? "Create account"                  : "Créer un compte",
+    subtitle:         currentLanguage === "ar" ? "انضم إلى StudyAI مجاناً"                 : currentLanguage === "en" ? "Join StudyAI for free"            : "Rejoins StudyAI gratuitement",
+    firstName:        currentLanguage === "ar" ? "الاسم الأول"                             : currentLanguage === "en" ? "First name"                      : "Prénom",
+    firstNamePH:      currentLanguage === "ar" ? "اسمك الأول"                              : currentLanguage === "en" ? "Your first name"                  : "Ton prénom",
+    lastName:         currentLanguage === "ar" ? "اسم العائلة"                             : currentLanguage === "en" ? "Last name"                       : "Nom",
+    lastNamePH:       currentLanguage === "ar" ? "اسم عائلتك"                              : currentLanguage === "en" ? "Your last name"                   : "Ton nom",
+    birthDate:        currentLanguage === "ar" ? "تاريخ الميلاد"                           : currentLanguage === "en" ? "Date of birth"                   : "Date de naissance",
+    emailLabel:       currentLanguage === "ar" ? "البريد الإلكتروني"                       : "Email",
+    emailPH:          currentLanguage === "ar" ? "بريدك@example.com"                       : currentLanguage === "en" ? "your@email.com"                   : "ton@email.com",
+    password:         currentLanguage === "ar" ? "كلمة المرور"                             : currentLanguage === "en" ? "Password"                        : "Mot de passe",
+    confirm:          currentLanguage === "ar" ? "تأكيد كلمة المرور"                       : currentLanguage === "en" ? "Confirm password"                 : "Confirmer le mot de passe",
+    passwordMismatch: currentLanguage === "ar" ? "كلمتا المرور غير متطابقتين"              : currentLanguage === "en" ? "Passwords do not match"           : "Les mots de passe ne correspondent pas",
+    passwordStrength: currentLanguage === "ar" ? "قوة كلمة المرور"                         : currentLanguage === "en" ? "Password strength"                : "Mot de passe",
+    createBtn:        currentLanguage === "ar" ? "إنشاء حسابي"                             : currentLanguage === "en" ? "Create my account"                : "Créer mon compte",
+    alreadyAccount:   currentLanguage === "ar" ? "هل لديك حساب؟ "                         : currentLanguage === "en" ? "Already have an account? "        : "Déjà un compte ? ",
+    signIn:           currentLanguage === "ar" ? "تسجيل الدخول"                            : currentLanguage === "en" ? "Sign in"                         : "Se connecter",
+    errName:          currentLanguage === "ar" ? "الاسم الأول واسم العائلة مطلوبان."       : currentLanguage === "en" ? "First and last name required."     : "Prénom et nom requis.",
+    errEmail:         currentLanguage === "ar" ? "البريد الإلكتروني وكلمة المرور مطلوبان." : currentLanguage === "en" ? "Email and password required."      : "Email et mot de passe requis.",
+    errMin:           currentLanguage === "ar" ? "6 أحرف على الأقل."                       : currentLanguage === "en" ? "Minimum 6 characters."            : "Minimum 6 caractères.",
+    errDuplicate:     currentLanguage === "ar" ? "يوجد حساب بهذا البريد. سجّل دخولك."     : currentLanguage === "en" ? "Account already exists. Sign in."  : "Un compte existe déjà. Connecte-toi.",
+    errFail:          currentLanguage === "ar" ? "فشل التسجيل. حاول مجدداً."              : currentLanguage === "en" ? "Registration failed. Try again."   : "Inscription échouée. Réessaie.",
+    selectLang:       currentLanguage === "ar" ? "اختر اللغة"                              : currentLanguage === "en" ? "Select language"                  : "Choisir la langue",
+    parentTitle:      currentLanguage === "ar" ? "⚠️ موافقة ولي الأمر مطلوبة"              : currentLanguage === "en" ? "⚠️ Parental consent required"       : "⚠️ Consentement parental requis",
     parentDesc:       currentLanguage === "ar" ? "نظراً لأنك أقل من 13 سنة، نحتاج موافقة ولي أمرك قبل تفعيل حسابك." : currentLanguage === "en" ? "Since you are under 13, we need your parent's approval before activating your account." : "Comme tu as moins de 13 ans, nous avons besoin de l'accord d'un parent pour activer ton compte.",
-    parentEmailLabel: currentLanguage === "ar" ? "بريد ولي الأمر"                     : currentLanguage === "en" ? "Parent email"                  : "Email du parent",
-    parentEmailPH:    currentLanguage === "ar" ? "بريد@parent.com"                    : currentLanguage === "en" ? "parent@email.com"               : "parent@email.com",
-    sendConsent:      currentLanguage === "ar" ? "إرسال طلب الموافقة"                 : currentLanguage === "en" ? "Send consent request"           : "Envoyer la demande de consentement",
-    consentSentMsg:   currentLanguage === "ar" ? "✅ تم إرسال البريد إلى ولي الأمر! تحقق من بريده الإلكتروني." : currentLanguage === "en" ? "✅ Email sent to parent! Ask them to check their inbox." : "✅ Email envoyé au parent ! Demande-lui de vérifier sa boîte mail.",
-    continueBtn:      currentLanguage === "ar" ? "متابعة إلى تسجيل الدخول"            : currentLanguage === "en" ? "Continue to login"             : "Continuer vers la connexion",
-    errParentEmail:   currentLanguage === "ar" ? "بريد ولي الأمر غير صالح."           : currentLanguage === "en" ? "Invalid parent email."          : "Email parent invalide.",
-    errConsentFail:   currentLanguage === "ar" ? "فشل إرسال الطلب. حاول مجدداً."     : currentLanguage === "en" ? "Failed to send request. Try again." : "Échec de l'envoi. Réessaie.",
+    parentEmailLabel: currentLanguage === "ar" ? "بريد ولي الأمر"                          : currentLanguage === "en" ? "Parent email"                     : "Email du parent",
+    parentEmailPH:    currentLanguage === "ar" ? "بريد@parent.com"                         : currentLanguage === "en" ? "parent@email.com"                 : "parent@email.com",
+    sendConsent:      currentLanguage === "ar" ? "إرسال طلب الموافقة"                      : currentLanguage === "en" ? "Send consent request"             : "Envoyer la demande de consentement",
+    consentSentMsg:   currentLanguage === "ar" ? "✅ تم إرسال البريد إلى ولي الأمر! تحقق من بريده الإلكتروني." : currentLanguage === "en" ? "✅ Email sent to parent! Ask them to check their inbox." : "✅ Email envoyé au parent ! Demande-lui de vérifier sa boîte mail et son dossier Spam.",
+    continueBtn:      currentLanguage === "ar" ? "متابعة إلى تسجيل الدخول"                 : currentLanguage === "en" ? "Continue to login"                : "Continuer vers la connexion",
+    errParentEmail:   currentLanguage === "ar" ? "بريد ولي الأمر غير صالح."                : currentLanguage === "en" ? "Invalid parent email."            : "Email parent invalide.",
+    errConsentFail:   currentLanguage === "ar" ? "فشل إرسال الطلب. حاول مجدداً."          : currentLanguage === "en" ? "Failed to send request. Try again." : "Échec de l'envoi. Réessaie.",
   };
 
   const formatDate = (date: Date) =>
@@ -127,12 +126,10 @@ export default function SignupScreen() {
 
       const age = getAge(birthDate);
       if (age < 13) {
-        // Mineur — afficher section consentement parental
         setShowParentSection(true);
         return;
       }
 
-      // Majeur — aller directement à login
       router.replace({
         pathname: "/(auth)/login",
         params: { email: email.trim(), justRegistered: "true" },
@@ -151,6 +148,10 @@ export default function SignupScreen() {
       Alert.alert("", t.errParentEmail);
       return;
     }
+    if (!lastCreatedUid) {
+      Alert.alert("", t.errConsentFail);
+      return;
+    }
     setSendingConsent(true);
     try {
       const fns = getFunctions(getApp(), "us-central1");
@@ -159,6 +160,7 @@ export default function SignupScreen() {
         parentEmail: parentEmail.trim(),
         childName: `${firstName} ${lastName}`,
         language: currentLanguage,
+        uid: lastCreatedUid,
       });
       setConsentSent(true);
     } catch (e: any) {
@@ -209,82 +211,81 @@ export default function SignupScreen() {
 
           {/* ── Section Consentement Parental ── */}
           {showParentSection ? (
-            <View>
-              <View style={{
-                backgroundColor: "#FFFBEB", borderRadius: 14, padding: 20,
-                marginBottom: 20, borderWidth: 1, borderColor: "#FCD34D",
-              }}>
-                <Text style={{ fontSize: 16, fontWeight: "700", color: "#92400E", marginBottom: 10, textAlign: isRTL ? "right" : "left" }}>
-                  {t.parentTitle}
-                </Text>
-                <Text style={{ fontSize: 14, color: "#92400E", lineHeight: 22, marginBottom: 20, textAlign: isRTL ? "right" : "left" }}>
-                  {t.parentDesc}
-                </Text>
+            <View style={{
+              backgroundColor: "#FFFBEB", borderRadius: 14, padding: 20,
+              borderWidth: 1, borderColor: "#FCD34D",
+            }}>
+              <Text style={{ fontSize: 16, fontWeight: "700", color: "#92400E", marginBottom: 10, textAlign: isRTL ? "right" : "left" }}>
+                {t.parentTitle}
+              </Text>
+              <Text style={{ fontSize: 14, color: "#92400E", lineHeight: 22, marginBottom: 20, textAlign: isRTL ? "right" : "left" }}>
+                {t.parentDesc}
+              </Text>
 
-                <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-                  {t.parentEmailLabel}
-                </Text>
-                <TextInput
-                  value={parentEmail}
-                  onChangeText={setParentEmail}
-                  placeholder={t.parentEmailPH}
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={!consentSent}
-                  textAlign={isRTL ? "right" : "left"}
-                  style={{
-                    backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-                    borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
-                    marginBottom: 16, opacity: consentSent ? 0.6 : 1,
-                  }}
-                />
+              <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
+                {t.parentEmailLabel}
+              </Text>
+              <TextInput
+                value={parentEmail}
+                onChangeText={setParentEmail}
+                placeholder={t.parentEmailPH}
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                editable={!consentSent}
+                textAlign={isRTL ? "right" : "left"}
+                style={{
+                  backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
+                  borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
+                  marginBottom: 16, opacity: consentSent ? 0.6 : 1,
+                }}
+              />
 
-                {consentSent ? (
-                  <View>
-                    <View style={{
-                      backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14,
-                      borderWidth: 1, borderColor: "#BBF7D0", marginBottom: 16,
-                    }}>
-                      <Text style={{ color: "#065F46", fontSize: 14, textAlign: "center", lineHeight: 20 }}>
-                        {t.consentSentMsg}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => router.replace({
-                        pathname: "/(auth)/login",
-                        params: { email: email.trim(), justRegistered: "true" },
-                      })}
-                      style={{
-                        backgroundColor: "#6366F1", borderRadius: 14,
-                        padding: 16, alignItems: "center",
-                      }}
-                    >
-                      <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
-                        {t.continueBtn}
-                      </Text>
-                    </TouchableOpacity>
+              {consentSent ? (
+                <View>
+                  <View style={{
+                    backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14,
+                    borderWidth: 1, borderColor: "#BBF7D0", marginBottom: 16,
+                  }}>
+                    <Text style={{ color: "#065F46", fontSize: 14, textAlign: "center", lineHeight: 20 }}>
+                      {t.consentSentMsg}
+                    </Text>
                   </View>
-                ) : (
                   <TouchableOpacity
-                    onPress={handleSendParentalConsent}
-                    disabled={sendingConsent || !parentEmail.trim()}
+                    onPress={() => router.replace({
+                      pathname: "/(auth)/login",
+                      params: { email: email.trim(), justRegistered: "true" },
+                    })}
                     style={{
-                      backgroundColor: sendingConsent || !parentEmail.trim() ? "#A5B4FC" : "#6366F1",
-                      borderRadius: 14, padding: 16, alignItems: "center",
+                      backgroundColor: "#6366F1", borderRadius: 14,
+                      padding: 16, alignItems: "center",
                     }}
                   >
-                    {sendingConsent ? (
-                      <ActivityIndicator color="#FFF" size="small" />
-                    ) : (
-                      <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 15 }}>
-                        {t.sendConsent}
-                      </Text>
-                    )}
+                    <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
+                      {t.continueBtn}
+                    </Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={handleSendParentalConsent}
+                  disabled={sendingConsent || !parentEmail.trim()}
+                  style={{
+                    backgroundColor: sendingConsent || !parentEmail.trim() ? "#A5B4FC" : "#6366F1",
+                    borderRadius: 14, padding: 16, alignItems: "center",
+                  }}
+                >
+                  {sendingConsent ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 15 }}>
+                      {t.sendConsent}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
+
           ) : (
             <View>
               {/* Prénom */}

@@ -10,10 +10,9 @@ const resendKey = defineSecret("RESEND_API_KEY");
 export const sendParentalConsent = onCall(
   { region: "us-central1", secrets: [resendKey], invoker: "public" },
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Non authentifié.");
+    const { parentEmail, childName, language = "fr", uid } = request.data;
 
-    const { parentEmail, childName, language = "fr" } = request.data;
+    if (!uid) throw new HttpsError("invalid-argument", "UID manquant.");
 
     if (!parentEmail || !parentEmail.includes("@")) {
       throw new HttpsError("invalid-argument", "Email parent invalide.");

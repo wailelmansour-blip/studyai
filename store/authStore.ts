@@ -92,6 +92,7 @@ interface AuthState {
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
+  lastCreatedUid: string | null;
   login: (email: string, password: string, lang?: string) => Promise<void>;
   signup: (
     email: string,
@@ -113,6 +114,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   isInitialized: false,
   error: null,
+  lastCreatedUid: null,
 
   initialize: () => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -162,12 +164,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isChild,
         plan: "free",
         isVerified: false,
+        parentalConsentStatus: isChild ? "pending" : null,
         createdAt: new Date().toISOString(),
       });
 
+      // Stocker l'uid avant signOut pour le consentement parental
+      const uid = cred.user.uid;
+
       await sendEmailVerification(cred.user);
       await signOut(auth);
-      set({ isLoading: false });
+      set({ isLoading: false, lastCreatedUid: uid });
     } catch (e: any) {
       const msg = getFirebaseError(e.code, lang);
       set({ isLoading: false, error: msg });
@@ -179,7 +185,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       await signOut(auth);
-      set({ user: null, isLoading: false });
+      set({ user: null, isLoading: false, lastCreatedUid: null });
     } catch (e: any) {
       set({ isLoading: false, error: e.message });
     }
