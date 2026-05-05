@@ -3,24 +3,23 @@ import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
   ActivityIndicator, Alert, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Platform, ScrollView, Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
-import { useLanguageStore } from "@/store/languageStore";
+import { useLanguageStore, LANGUAGES, Language } from "@/store/languageStore";
 import {
   getAuth, signInWithEmailAndPassword,
   sendEmailVerification, signOut,
 } from "firebase/auth";
 import app from "@/src/config/firebase";
-const { currentLanguage, setLanguage } = useLanguageStore();
 
 export default function LoginScreen() {
   const params = useLocalSearchParams<{ email?: string; justRegistered?: string }>();
   const { login, isLoading, clearError } = useAuthStore();
-  const { currentLanguage } = useLanguageStore();
+  const { currentLanguage, setLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
 
   const [email, setEmail] = useState(params.email || "");
@@ -28,31 +27,34 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showResend, setShowResend] = useState(params.justRegistered === "true");
   const [resending, setResending] = useState(false);
+  const [showLangModal, setShowLangModal] = useState(false);
+  const [changingLang, setChangingLang] = useState(false);
 
   const t = {
-    title: currentLanguage === "ar" ? "تسجيل الدخول" : currentLanguage === "en" ? "Sign in" : "Connexion",
-    subtitle: currentLanguage === "ar" ? "سجّل دخولك للمتابعة" : currentLanguage === "en" ? "Sign in to continue" : "Connecte-toi pour continuer",
-    emailLabel: currentLanguage === "ar" ? "البريد الإلكتروني" : "Email",
-    emailPlaceholder: currentLanguage === "ar" ? "بريدك@example.com" : currentLanguage === "en" ? "your@email.com" : "ton@email.com",
-    passwordLabel: currentLanguage === "ar" ? "كلمة المرور" : currentLanguage === "en" ? "Password" : "Mot de passe",
-    loginBtn: currentLanguage === "ar" ? "تسجيل الدخول" : currentLanguage === "en" ? "Sign in" : "Se connecter",
-    noAccount: currentLanguage === "ar" ? "ليس لديك حساب؟ " : currentLanguage === "en" ? "No account? " : "Pas de compte ? ",
-    createAccount: currentLanguage === "ar" ? "إنشاء حساب" : currentLanguage === "en" ? "Create account" : "Créer un compte",
-    errorRequired: currentLanguage === "ar" ? "البريد الإلكتروني وكلمة المرور مطلوبان." : currentLanguage === "en" ? "Email and password are required." : "Email et mot de passe requis.",
-    errorLogin: currentLanguage === "ar" ? "فشل تسجيل الدخول. تحقق من بياناتك." : currentLanguage === "en" ? "Login failed. Check your credentials." : "Connexion échouée. Vérifie tes identifiants.",
-    notVerified: currentLanguage === "ar"
+    title:        currentLanguage === "ar" ? "تسجيل الدخول"       : currentLanguage === "en" ? "Sign in"              : "Connexion",
+    subtitle:     currentLanguage === "ar" ? "سجّل دخولك للمتابعة" : currentLanguage === "en" ? "Sign in to continue"  : "Connecte-toi pour continuer",
+    emailLabel:   currentLanguage === "ar" ? "البريد الإلكتروني"   : "Email",
+    emailPH:      currentLanguage === "ar" ? "بريدك@example.com"   : currentLanguage === "en" ? "your@email.com"       : "ton@email.com",
+    passwordLabel:currentLanguage === "ar" ? "كلمة المرور"         : currentLanguage === "en" ? "Password"             : "Mot de passe",
+    loginBtn:     currentLanguage === "ar" ? "تسجيل الدخول"        : currentLanguage === "en" ? "Sign in"              : "Se connecter",
+    noAccount:    currentLanguage === "ar" ? "ليس لديك حساب؟ "     : currentLanguage === "en" ? "No account? "         : "Pas de compte ? ",
+    createAccount:currentLanguage === "ar" ? "إنشاء حساب"          : currentLanguage === "en" ? "Create account"       : "Créer un compte",
+    errorRequired:currentLanguage === "ar" ? "البريد الإلكتروني وكلمة المرور مطلوبان." : currentLanguage === "en" ? "Email and password are required." : "Email et mot de passe requis.",
+    errorLogin:   currentLanguage === "ar" ? "فشل تسجيل الدخول. تحقق من بياناتك." : currentLanguage === "en" ? "Login failed. Check your credentials." : "Connexion échouée. Vérifie tes identifiants.",
+    notVerified:  currentLanguage === "ar"
       ? "⚠️ بريدك الإلكتروني لم يتم التحقق منه بعد. تحقق من صندوق الوارد ومجلد البريد العشوائي (Spam)."
       : currentLanguage === "en"
       ? "⚠️ Your email is not verified yet. Check your inbox and your Spam or Junk folder."
       : "⚠️ Ton email n'est pas encore vérifié. Vérifie ta boîte mail et ton dossier Spam ou Courrier indésirable.",
-    resendBtn: currentLanguage === "ar" ? "إعادة إرسال بريد التحقق" : currentLanguage === "en" ? "Resend verification email" : "Renvoyer l'email de vérification",
-    resendSuccess: currentLanguage === "ar" ? "تم إرسال بريد التحقق!" : currentLanguage === "en" ? "Verification email sent!" : "Email de vérification renvoyé !",
-    resendError: currentLanguage === "ar" ? "تعذر إرسال البريد. تحقق من بياناتك." : currentLanguage === "en" ? "Could not resend email. Check your credentials." : "Impossible de renvoyer l'email. Vérifie tes identifiants.",
+    resendBtn:    currentLanguage === "ar" ? "إعادة إرسال بريد التحقق" : currentLanguage === "en" ? "Resend verification email" : "Renvoyer l'email de vérification",
+    resendSuccess:currentLanguage === "ar" ? "تم إرسال بريد التحقق!"   : currentLanguage === "en" ? "Verification email sent!"  : "Email de vérification renvoyé !",
+    resendError:  currentLanguage === "ar" ? "تعذر إرسال البريد. تحقق من بياناتك." : currentLanguage === "en" ? "Could not resend email. Check your credentials." : "Impossible de renvoyer l'email. Vérifie tes identifiants.",
+    selectLang:   currentLanguage === "ar" ? "اختر اللغة" : currentLanguage === "en" ? "Select language" : "Choisir la langue",
   };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Erreur", t.errorRequired);
+      Alert.alert("", t.errorRequired);
       return;
     }
     clearError();
@@ -83,6 +85,24 @@ export default function LoginScreen() {
     }
   };
 
+  const handleLanguageChange = async (lang: Language) => {
+    if (lang === currentLanguage) {
+      setShowLangModal(false);
+      return;
+    }
+    setChangingLang(true);
+    setShowLangModal(false);
+    try {
+      await setLanguage(lang);
+    } catch (e) {
+      console.log("Language change error:", e);
+    } finally {
+      setChangingLang(false);
+    }
+  };
+
+  const currentLang = LANGUAGES.find((l) => l.code === currentLanguage);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
       <KeyboardAvoidingView
@@ -90,33 +110,24 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView
-        
           contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center" }}
           keyboardShouldPersistTaps="handled"
         >
-
           {/* Sélecteur langue */}
-<View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 16 }}>
-  {[
-    { code: "fr", flag: "🇫🇷" },
-    { code: "en", flag: "🇬🇧" },
-    { code: "ar", flag: "🇸🇦" },
-  ].map((lang) => (
-    <TouchableOpacity
-      key={lang.code}
-      onPress={() => setLanguage(lang.code as any)}
-      style={{
-        paddingHorizontal: 8, paddingVertical: 4,
-        marginLeft: 6, borderRadius: 8,
-        backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "transparent",
-        borderWidth: 1,
-        borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
-      }}
-    >
-      <Text style={{ fontSize: 20 }}>{lang.flag}</Text>
-    </TouchableOpacity>
-  ))}
-</View>
+          <TouchableOpacity
+            onPress={() => setShowLangModal(true)}
+            style={{
+              flexDirection: "row", alignItems: "center", justifyContent: "flex-end",
+              marginBottom: 24, gap: 6,
+            }}
+          >
+            <Text style={{ fontSize: 20 }}>{currentLang?.flag}</Text>
+            <Text style={{ fontSize: 13, color: "#6B7280", fontWeight: "500" }}>
+              {currentLang?.nativeLabel}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="#6B7280" />
+          </TouchableOpacity>
+
           {/* Logo */}
           <View style={{ alignItems: "center", marginBottom: 40 }}>
             <View style={{
@@ -176,7 +187,7 @@ export default function LoginScreen() {
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder={t.emailPlaceholder}
+            placeholder={t.emailPH}
             placeholderTextColor="#9CA3AF"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -253,6 +264,56 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modal sélection langue */}
+      <Modal
+        visible={showLangModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLangModal(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "#00000050" }}
+          onPress={() => setShowLangModal(false)}
+          activeOpacity={1}
+        >
+          <View style={{
+            position: "absolute", bottom: 0, left: 0, right: 0,
+            backgroundColor: "#FFFFFF", borderTopLeftRadius: 20,
+            borderTopRightRadius: 20, padding: 24, paddingBottom: 40,
+          }}>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 20 }}>
+              {t.selectLang}
+            </Text>
+            {LANGUAGES.map((lang) => (
+              <TouchableOpacity
+                key={lang.code}
+                onPress={() => handleLanguageChange(lang.code)}
+                style={{
+                  flexDirection: "row", alignItems: "center", padding: 16,
+                  borderRadius: 12, marginBottom: 8,
+                  backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "#F8F9FA",
+                  borderWidth: 1.5,
+                  borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
+                }}
+              >
+                <Text style={{ fontSize: 28, marginRight: 14 }}>{lang.flag}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#111827" }}>
+                    {lang.nativeLabel}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+                    {lang.label}
+                  </Text>
+                </View>
+                {currentLanguage === lang.code && (
+                  <Ionicons name="checkmark-circle" size={22} color="#6366F1" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
