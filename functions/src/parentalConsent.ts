@@ -2,13 +2,14 @@ import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
-import { Resend } from "resend";
+import * as nodemailer from "nodemailer";
 
-const resendKey = defineSecret("RESEND_API_KEY");
+const gmailUser = defineSecret("GMAIL_USER");
+const gmailPass = defineSecret("GMAIL_PASS");
 
 // ── Envoyer email de consentement au parent ────────────────────────────────
 export const sendParentalConsent = onRequest(
-  { region: "us-central1", secrets: [resendKey], invoker: "public" },
+  { region: "us-central1", secrets: [gmailUser, gmailPass], invoker: "public" },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -57,9 +58,16 @@ export const sendParentalConsent = onRequest(
 
       const html = buildEmail(childName, approveUrl, rejectUrl, language);
 
-      const resend = new Resend(resendKey.value());
-      await resend.emails.send({
-        from: "StudyAI <onboarding@resend.dev>",
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: gmailUser.value(),
+          pass: gmailPass.value(),
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"StudyAI" <${gmailUser.value()}>`,
         to: parentEmail,
         subject,
         html,
@@ -75,7 +83,7 @@ export const sendParentalConsent = onRequest(
 
 // ── Approuver ou rejeter via lien email ────────────────────────────────────
 export const approveParentalConsent = onRequest(
-  { region: "us-central1", secrets: [resendKey] },
+  { region: "us-central1", secrets: [gmailUser, gmailPass] },
   async (req, res) => {
     const { token, uid, action } = req.query as Record<string, string>;
 
