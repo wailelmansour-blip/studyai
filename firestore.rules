@@ -113,6 +113,14 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
     }
 
+    // ── aiCache ──────────────────────────────────────────────────
+    match /aiCache/{cacheId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
+
     // ── deleted_users ────────────────────────────────────────────
     match /deleted_users/{docId} {
       allow read: if false;
@@ -159,9 +167,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    //--------parental autorisation--------------------------
+    // ── parental_consents ────────────────────────────────────────
     match /parental_consents/{uid} {
-  allow read, write: if isOwner(uid);
-}
+      allow read, write: if isOwner(uid);
+    }
   }
 }
