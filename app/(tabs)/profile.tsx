@@ -1,7 +1,7 @@
 // app/(tabs)/profile.tsx
 import React, { useState, useEffect } from "react";
 import {
-  View, Text, TouchableOpacity, ScrollView,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
   Alert, Modal, Switch, Platform, ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,6 +16,7 @@ import { useDeleteHistory, HistoryType } from "../../hooks/useDeleteHistory";
 import { useHistoryStore } from "../../store/historyStore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getApp } from "firebase/app";
+import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -27,9 +28,21 @@ export default function ProfileScreen() {
   const [changingLang, setChangingLang] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
+  // ── Profil utilisateur ──
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [age, setAge] = useState<number | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editAge, setEditAge] = useState("");
+
   const { confirmDeleteAll } = useDeleteHistory();
   const { triggerRefresh } = useHistoryStore();
   const functions = getFunctions(getApp(), "us-central1");
+  const db = getFirestore(getApp());
 
   // ── Phase 16 ──
   const {
@@ -44,28 +57,95 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadSettings(currentLanguage);
     checkPermission();
+    loadProfile();
   }, []);
-  // ── fin Phase 16 ──
 
-  const displayName = user?.email?.split("@")[0] || "Étudiant";
+  const loadProfile = async () => {
+    if (!user) return;
+    setLoadingProfile(true);
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (snap.exists()) {
+        const data = snap.data();
+        setFirstName(data.firstName || "");
+        setLastName(data.lastName || "");
+        setAge(data.age || null);
+      }
+    } catch (e) {
+      console.log("loadProfile error:", e);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  const handleEditProfile = () => {
+    setEditFirstName(firstName);
+    setEditLastName(lastName);
+    setEditAge(age?.toString() || "");
+    setEditingProfile(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editFirstName.trim() || !editLastName.trim()) {
+      Alert.alert("", getLabel("Prénom et nom requis.", "First and last name required.", "الاسم الأول واسم العائلة مطلوبان."));
+      return;
+    }
+    const ageNum = parseInt(editAge);
+    if (editAge && (isNaN(ageNum) || ageNum < 1 || ageNum > 120)) {
+      Alert.alert("", getLabel("Âge invalide.", "Invalid age.", "عمر غير صالح."));
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      await updateDoc(doc(db, "users", user!.uid), {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim(),
+        age: ageNum || age,
+      });
+      setFirstName(editFirstName.trim());
+      setLastName(editLastName.trim());
+      if (ageNum) setAge(ageNum);
+      setEditingProfile(false);
+      Alert.alert("✅", getLabel("Profil mis à jour !", "Profile updated!", "تم تحديث الملف الشخصي!"));
+    } catch (e: any) {
+      Alert.alert("", e.message || getLabel("Erreur lors de la mise à jour.", "Update failed.", "فشل التحديث."));
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const displayName = firstName || user?.email?.split("@")[0] || "Étudiant";
   const currentLang = LANGUAGES.find((l) => l.code === currentLanguage);
 
   const getLabel = (fr: string, en: string, ar: string) =>
     currentLanguage === "ar" ? ar : currentLanguage === "en" ? en : fr;
 
   const deleteLabels = {
-    title:   getLabel("Supprimer le compte",               "Delete Account",                  "حذف الحساب"),
-    msg:     getLabel("Cette action est irréversible. Toutes vos données seront définitivement supprimées.", "This action cannot be undone. All your data will be permanently deleted.", "هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً."),
-    cancel:  getLabel("Annuler",                           "Cancel",                          "إلغاء"),
-    confirm: getLabel("Supprimer définitivement",          "Delete permanently",              "حذف نهائياً"),
-    btn:     getLabel("Supprimer mon compte",              "Delete my account",               "حذف الحساب نهائياً"),
-    error:   getLabel("Échec de la suppression du compte", "Failed to delete account",        "فشل حذف الحساب"),
-    errTitle:getLabel("Erreur",                            "Error",                           "خطأ"),
+    title:    getLabel("Supprimer le compte",               "Delete Account",                  "حذف الحساب"),
+    msg:      getLabel("Cette action est irréversible. Toutes vos données seront définitivement supprimées.", "This action cannot be undone. All your data will be permanently deleted.", "هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك نهائياً."),
+    cancel:   getLabel("Annuler",                           "Cancel",                          "إلغاء"),
+    confirm:  getLabel("Supprimer définitivement",          "Delete permanently",              "حذف نهائياً"),
+    btn:      getLabel("Supprimer mon compte",              "Delete my account",               "حذف الحساب نهائياً"),
+    error:    getLabel("Échec de la suppression du compte", "Failed to delete account",        "فشل حذف الحساب"),
+    errTitle: getLabel("Erreur",                            "Error",                           "خطأ"),
   };
 
   const historyLabels = {
-    title:    getLabel("HISTORIQUE & SAUVEGARDES", "HISTORY & SAVED",   "السجل والمحفوظات"),
-    clearAll: getLabel("Tout effacer",             "Clear all",          "حذف الكل"),
+    title:    getLabel("HISTORIQUE & SAUVEGARDES", "HISTORY & SAVED",  "السجل والمحفوظات"),
+    clearAll: getLabel("Tout effacer",             "Clear all",         "حذف الكل"),
+  };
+
+  const profileLabels = {
+    title:      getLabel("Informations personnelles", "Personal information", "المعلومات الشخصية"),
+    firstName:  getLabel("Prénom",                    "First name",           "الاسم الأول"),
+    lastName:   getLabel("Nom",                       "Last name",            "اسم العائلة"),
+    age:        getLabel("Âge",                       "Age",                  "العمر"),
+    email:      getLabel("Email",                     "Email",                "البريد الإلكتروني"),
+    emailNote:  getLabel("Non modifiable",            "Read only",            "غير قابل للتعديل"),
+    edit:       getLabel("Modifier",                  "Edit",                 "تعديل"),
+    save:       getLabel("Enregistrer",               "Save",                 "حفظ"),
+    cancel:     getLabel("Annuler",                   "Cancel",               "إلغاء"),
+    years:      getLabel("ans",                       "years",                "سنة"),
   };
 
   const handleLogout = () => {
@@ -76,19 +156,10 @@ export default function ProfileScreen() {
   };
 
   const handleLanguageChange = async (lang: Language) => {
-    if (lang === currentLanguage) {
-      setShowLangModal(false);
-      return;
-    }
+    if (lang === currentLanguage) { setShowLangModal(false); return; }
     setChangingLang(true);
     setShowLangModal(false);
-    try {
-      await setLanguage(lang);
-    } catch (e) {
-      console.log("Language change error:", e);
-    } finally {
-      setChangingLang(false);
-    }
+    try { await setLanguage(lang); } catch (e) { console.log(e); } finally { setChangingLang(false); }
   };
 
   const handleDeleteAccount = () => {
@@ -112,13 +183,13 @@ export default function ProfileScreen() {
   };
 
   const HISTORY_ITEMS: { type: HistoryType; labelFr: string; labelEn: string; labelAr: string; icon: string }[] = [
-    { type: "quizzes",      labelFr: "Quiz",           labelEn: "Quizzes",       labelAr: "اختبارات",    icon: "🧠" },
-    { type: "flashcards",   labelFr: "Flashcards",     labelEn: "Flashcards",    labelAr: "بطاقات",      icon: "🃏" },
-    { type: "plans",        labelFr: "Plans d'étude",  labelEn: "Study Plans",   labelAr: "خطط الدراسة", icon: "📅" },
-    { type: "summaries",    labelFr: "Résumés",        labelEn: "Summaries",     labelAr: "ملخصات",      icon: "📄" },
-    { type: "explanations", labelFr: "Explications",   labelEn: "Explanations",  labelAr: "شروحات",      icon: "💡" },
-    { type: "solutions",    labelFr: "Solutions",      labelEn: "Solutions",     labelAr: "حلول",        icon: "✏️" },
-    { type: "chatSessions", labelFr: "Chat IA",        labelEn: "AI Chat",       labelAr: "محادثات الذكاء", icon: "💬" },
+    { type: "quizzes",      labelFr: "Quiz",          labelEn: "Quizzes",      labelAr: "اختبارات",       icon: "🧠" },
+    { type: "flashcards",   labelFr: "Flashcards",    labelEn: "Flashcards",   labelAr: "بطاقات",         icon: "🃏" },
+    { type: "plans",        labelFr: "Plans d'étude", labelEn: "Study Plans",  labelAr: "خطط الدراسة",    icon: "📅" },
+    { type: "summaries",    labelFr: "Résumés",       labelEn: "Summaries",    labelAr: "ملخصات",         icon: "📄" },
+    { type: "explanations", labelFr: "Explications",  labelEn: "Explanations", labelAr: "شروحات",         icon: "💡" },
+    { type: "solutions",    labelFr: "Solutions",     labelEn: "Solutions",    labelAr: "حلول",           icon: "✏️" },
+    { type: "chatSessions", labelFr: "Chat IA",       labelEn: "AI Chat",      labelAr: "محادثات الذكاء", icon: "💬" },
   ];
 
   return (
@@ -135,16 +206,251 @@ export default function ProfileScreen() {
             width: 80, height: 80, borderRadius: 40, backgroundColor: "#EEF2FF",
             alignItems: "center", justifyContent: "center", marginBottom: 12,
           }}>
-            <Text style={{ fontSize: 32, fontWeight: "700", color: "#6366F1" }}>
-              {displayName.charAt(0).toUpperCase()}
-            </Text>
+            {loadingProfile ? (
+              <ActivityIndicator color="#6366F1" />
+            ) : (
+              <Text style={{ fontSize: 32, fontWeight: "700", color: "#6366F1" }}>
+                {displayName.charAt(0).toUpperCase()}
+              </Text>
+            )}
           </View>
           <Text style={{ fontSize: 20, fontWeight: "700", color: "#111827" }}>
-            {displayName}
+            {firstName && lastName ? `${firstName} ${lastName}` : displayName}
           </Text>
           <Text style={{ fontSize: 14, color: "#6B7280", marginTop: 4 }}>
             {user?.email}
           </Text>
+          {age && (
+            <Text style={{ fontSize: 13, color: "#9CA3AF", marginTop: 2 }}>
+              {age} {profileLabels.years}
+            </Text>
+          )}
+        </View>
+
+        {/* ── Section Profil ── */}
+        <View style={{
+          backgroundColor: "#FFFFFF", borderRadius: 14,
+          borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, overflow: "hidden",
+        }}>
+          <View style={{
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", justifyContent: "space-between",
+            padding: 16, borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
+          }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
+              {profileLabels.title.toUpperCase()}
+            </Text>
+            {!editingProfile && (
+              <TouchableOpacity onPress={handleEditProfile}>
+                <Text style={{ fontSize: 13, color: "#6366F1", fontWeight: "600" }}>
+                  ✏️ {profileLabels.edit}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {editingProfile ? (
+            <View style={{ padding: 16 }}>
+              {/* Edit Prénom */}
+              <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
+                {profileLabels.firstName}
+              </Text>
+              <TextInput
+                value={editFirstName}
+                onChangeText={setEditFirstName}
+                autoCapitalize="words"
+                textAlign={isRTL ? "right" : "left"}
+                style={{
+                  backgroundColor: "#F8F9FA", borderWidth: 1, borderColor: "#E5E7EB",
+                  borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", marginBottom: 12,
+                }}
+              />
+
+              {/* Edit Nom */}
+              <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
+                {profileLabels.lastName}
+              </Text>
+              <TextInput
+                value={editLastName}
+                onChangeText={setEditLastName}
+                autoCapitalize="words"
+                textAlign={isRTL ? "right" : "left"}
+                style={{
+                  backgroundColor: "#F8F9FA", borderWidth: 1, borderColor: "#E5E7EB",
+                  borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", marginBottom: 12,
+                }}
+              />
+
+              {/* Edit Âge */}
+              <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
+                {profileLabels.age}
+              </Text>
+              <TextInput
+                value={editAge}
+                onChangeText={setEditAge}
+                keyboardType="numeric"
+                maxLength={3}
+                textAlign={isRTL ? "right" : "left"}
+                style={{
+                  backgroundColor: "#F8F9FA", borderWidth: 1, borderColor: "#E5E7EB",
+                  borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", marginBottom: 16,
+                }}
+              />
+
+              {/* Email (lecture seule) */}
+              <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
+                {profileLabels.email} — <Text style={{ color: "#D1D5DB" }}>{profileLabels.emailNote}</Text>
+              </Text>
+              <View style={{
+                backgroundColor: "#F3F4F6", borderRadius: 10, padding: 12, marginBottom: 20,
+              }}>
+                <Text style={{ fontSize: 15, color: "#9CA3AF", textAlign: isRTL ? "right" : "left" }}>
+                  {user?.email}
+                </Text>
+              </View>
+
+              {/* Boutons */}
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
+                <TouchableOpacity
+                  onPress={() => setEditingProfile(false)}
+                  style={{
+                    flex: 1, borderRadius: 10, padding: 12, alignItems: "center",
+                    backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+                  }}
+                >
+                  <Text style={{ fontWeight: "600", color: "#374151" }}>{profileLabels.cancel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSaveProfile}
+                  disabled={savingProfile}
+                  style={{
+                    flex: 1, borderRadius: 10, padding: 12, alignItems: "center",
+                    backgroundColor: savingProfile ? "#A5B4FC" : "#6366F1",
+                  }}
+                >
+                  {savingProfile ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={{ fontWeight: "600", color: "#FFF" }}>{profileLabels.save}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View>
+              {/* Prénom */}
+              <View style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                alignItems: "center", padding: 16,
+                borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
+              }}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF",
+                  alignItems: "center", justifyContent: "center",
+                  marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+                }}>
+                  <Ionicons name="person-outline" size={18} color="#6366F1" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2, textAlign: isRTL ? "right" : "left" }}>
+                    {profileLabels.firstName}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+                    {firstName || "—"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Nom */}
+              <View style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                alignItems: "center", padding: 16,
+                borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
+              }}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF",
+                  alignItems: "center", justifyContent: "center",
+                  marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+                }}>
+                  <Ionicons name="people-outline" size={18} color="#6366F1" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2, textAlign: isRTL ? "right" : "left" }}>
+                    {profileLabels.lastName}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+                    {lastName || "—"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Âge */}
+              <View style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                alignItems: "center", padding: 16,
+                borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
+              }}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF",
+                  alignItems: "center", justifyContent: "center",
+                  marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+                }}>
+                  <Ionicons name="calendar-number-outline" size={18} color="#6366F1" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2, textAlign: isRTL ? "right" : "left" }}>
+                    {profileLabels.age}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+                    {age ? `${age} ${profileLabels.years}` : "—"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Email */}
+              <View style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                alignItems: "center", padding: 16,
+                borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
+              }}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 10, backgroundColor: "#6366F115",
+                  alignItems: "center", justifyContent: "center",
+                  marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+                }}>
+                  <Ionicons name="mail-outline" size={18} color="#6366F1" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2, textAlign: isRTL ? "right" : "left" }}>
+                    {profileLabels.email}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+                    {user?.email}
+                  </Text>
+                </View>
+                <View style={{ backgroundColor: "#F3F4F6", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, color: "#9CA3AF" }}>{profileLabels.emailNote}</Text>
+                </View>
+              </View>
+
+              {/* Compte vérifié */}
+              <View style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                alignItems: "center", padding: 16,
+              }}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 10, backgroundColor: "#10B98115",
+                  alignItems: "center", justifyContent: "center",
+                  marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+                }}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#10B981" />
+                </View>
+                <Text style={{ fontSize: 14, color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }}>
+                  {t("verified_account")}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Sélecteur de langue */}
@@ -157,7 +463,6 @@ export default function ProfileScreen() {
             style={{
               flexDirection: isRTL ? "row-reverse" : "row",
               alignItems: "center", padding: 16,
-              borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
             }}
           >
             <View style={{
@@ -178,41 +483,6 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
           </TouchableOpacity>
-
-          {/* Email */}
-          <View style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
-            alignItems: "center", padding: 16,
-            borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
-          }}>
-            <View style={{
-              width: 36, height: 36, borderRadius: 10, backgroundColor: "#6366F115",
-              alignItems: "center", justifyContent: "center",
-              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
-            }}>
-              <Ionicons name="mail-outline" size={18} color="#6366F1" />
-            </View>
-            <Text style={{ fontSize: 14, color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }}>
-              {user?.email}
-            </Text>
-          </View>
-
-          {/* Compte vérifié */}
-          <View style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
-            alignItems: "center", padding: 16,
-          }}>
-            <View style={{
-              width: 36, height: 36, borderRadius: 10, backgroundColor: "#10B98115",
-              alignItems: "center", justifyContent: "center",
-              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
-            }}>
-              <Ionicons name="shield-checkmark-outline" size={18} color="#10B981" />
-            </View>
-            <Text style={{ fontSize: 14, color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }}>
-              {t("verified_account")}
-            </Text>
-          </View>
         </View>
 
         {/* ── Section Notifications ── */}
@@ -250,7 +520,6 @@ export default function ProfileScreen() {
           backgroundColor: "#FFFFFF", borderRadius: 14,
           borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, overflow: "hidden",
         }}>
-          {/* Toggle général */}
           <View style={{
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center", padding: 16,
@@ -274,7 +543,6 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Rappel quotidien */}
           <View style={{
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center", padding: 16,
@@ -308,7 +576,6 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Heure du rappel */}
           {settings.enabled && settings.studyReminderEnabled && (
             <TouchableOpacity
               onPress={() => setShowTimePicker(true)}
@@ -337,7 +604,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Alertes plan */}
           <View style={{
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center", padding: 16,
@@ -370,7 +636,6 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Bouton test */}
           <TouchableOpacity
             onPress={() => sendTestNotification(currentLanguage)}
             disabled={!settings.enabled || !hasPermission}
@@ -393,7 +658,6 @@ export default function ProfileScreen() {
             <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
           </TouchableOpacity>
         </View>
-        {/* ── fin Notifications ── */}
 
         {/* ── Section Historiques ── */}
         <View style={{
@@ -442,7 +706,6 @@ export default function ProfileScreen() {
             );
           })}
         </View>
-        {/* ── fin Historiques ── */}
 
         {/* Logout */}
         <TouchableOpacity
