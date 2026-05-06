@@ -122,11 +122,23 @@ export const useAuthStore = create<AuthState>((set) => ({
   setFirstName: (name) => set({ firstName: name }),
 
   initialize: () => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      set({ user, isInitialized: true });
-    });
-    return unsubscribe;
-  },
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      // Charger le prénom dès que l'utilisateur est détecté
+      try {
+        const db = getFirestore(app);
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const firstName = snap.exists() ? snap.data().firstName || null : null;
+        set({ user, isInitialized: true, firstName });
+      } catch {
+        set({ user, isInitialized: true });
+      }
+    } else {
+      set({ user: null, isInitialized: true, firstName: null });
+    }
+  });
+  return unsubscribe;
+},
 
   login: async (email, password, lang = "fr") => {
     set({ isLoading: true, error: null });
