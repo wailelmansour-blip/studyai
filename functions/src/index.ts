@@ -16,6 +16,7 @@ export { extractText } from "./extractText";
 export { deleteAccount } from "./deleteAccount";
 export { sendParentalConsent, approveParentalConsent } from "./parentalConsent";
 const openaiKey = defineSecret("OPENAI_API_KEY");
+export { cleanupUnverifiedAccounts } from "./cleanupUnverifiedAccounts";
 
 // ── explainText ───────────────────────────────────────────
 export const explainText = onCall(

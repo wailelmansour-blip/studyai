@@ -31,25 +31,30 @@ export default function LoginScreen() {
   const [changingLang, setChangingLang] = useState(false);
 
   const t = {
-    title:        currentLanguage === "ar" ? "تسجيل الدخول"       : currentLanguage === "en" ? "Sign in"              : "Connexion",
-    subtitle:     currentLanguage === "ar" ? "سجّل دخولك للمتابعة" : currentLanguage === "en" ? "Sign in to continue"  : "Connecte-toi pour continuer",
-    emailLabel:   currentLanguage === "ar" ? "البريد الإلكتروني"   : "Email",
-    emailPH:      currentLanguage === "ar" ? "بريدك@example.com"   : currentLanguage === "en" ? "your@email.com"       : "ton@email.com",
-    passwordLabel:currentLanguage === "ar" ? "كلمة المرور"         : currentLanguage === "en" ? "Password"             : "Mot de passe",
-    loginBtn:     currentLanguage === "ar" ? "تسجيل الدخول"        : currentLanguage === "en" ? "Sign in"              : "Se connecter",
-    noAccount:    currentLanguage === "ar" ? "ليس لديك حساب؟ "     : currentLanguage === "en" ? "No account? "         : "Pas de compte ? ",
-    createAccount:currentLanguage === "ar" ? "إنشاء حساب"          : currentLanguage === "en" ? "Create account"       : "Créer un compte",
-    errorRequired:currentLanguage === "ar" ? "البريد الإلكتروني وكلمة المرور مطلوبان." : currentLanguage === "en" ? "Email and password are required." : "Email et mot de passe requis.",
-    errorLogin:   currentLanguage === "ar" ? "فشل تسجيل الدخول. تحقق من بياناتك." : currentLanguage === "en" ? "Login failed. Check your credentials." : "Connexion échouée. Vérifie tes identifiants.",
-    notVerified:  currentLanguage === "ar"
+    title:         currentLanguage === "ar" ? "تسجيل الدخول"       : currentLanguage === "en" ? "Sign in"              : "Connexion",
+    subtitle:      currentLanguage === "ar" ? "سجّل دخولك للمتابعة" : currentLanguage === "en" ? "Sign in to continue"  : "Connecte-toi pour continuer",
+    emailLabel:    currentLanguage === "ar" ? "البريد الإلكتروني"   : "Email",
+    emailPH:       currentLanguage === "ar" ? "بريدك@example.com"   : currentLanguage === "en" ? "your@email.com"       : "ton@email.com",
+    passwordLabel: currentLanguage === "ar" ? "كلمة المرور"         : currentLanguage === "en" ? "Password"             : "Mot de passe",
+    loginBtn:      currentLanguage === "ar" ? "تسجيل الدخول"        : currentLanguage === "en" ? "Sign in"              : "Se connecter",
+    noAccount:     currentLanguage === "ar" ? "ليس لديك حساب؟ "     : currentLanguage === "en" ? "No account? "         : "Pas de compte ? ",
+    createAccount: currentLanguage === "ar" ? "إنشاء حساب"          : currentLanguage === "en" ? "Create account"       : "Créer un compte",
+    errorRequired: currentLanguage === "ar" ? "البريد الإلكتروني وكلمة المرور مطلوبان." : currentLanguage === "en" ? "Email and password are required." : "Email et mot de passe requis.",
+    errorLogin:    currentLanguage === "ar" ? "فشل تسجيل الدخول. تحقق من بياناتك." : currentLanguage === "en" ? "Login failed. Check your credentials." : "Connexion échouée. Vérifie tes identifiants.",
+    notVerified:   currentLanguage === "ar"
       ? "⚠️ بريدك الإلكتروني لم يتم التحقق منه بعد. تحقق من صندوق الوارد ومجلد البريد العشوائي (Spam)."
       : currentLanguage === "en"
       ? "⚠️ Your email is not verified yet. Check your inbox and your Spam or Junk folder."
       : "⚠️ Ton email n'est pas encore vérifié. Vérifie ta boîte mail et ton dossier Spam ou Courrier indésirable.",
-    resendBtn:    currentLanguage === "ar" ? "إعادة إرسال بريد التحقق" : currentLanguage === "en" ? "Resend verification email" : "Renvoyer l'email de vérification",
-    resendSuccess:currentLanguage === "ar" ? "تم إرسال بريد التحقق!"   : currentLanguage === "en" ? "Verification email sent!"  : "Email de vérification renvoyé !",
-    resendError:  currentLanguage === "ar" ? "تعذر إرسال البريد. تحقق من بياناتك." : currentLanguage === "en" ? "Could not resend email. Check your credentials." : "Impossible de renvoyer l'email. Vérifie tes identifiants.",
-    selectLang:   currentLanguage === "ar" ? "اختر اللغة" : currentLanguage === "en" ? "Select language" : "Choisir la langue",
+    expiring:      currentLanguage === "ar"
+      ? "⏰ تنبيه : سيتم حذف حسابك خلال 24 ساعة إذا لم يتم التحقق منه."
+      : currentLanguage === "en"
+      ? "⏰ Warning: Your account will be deleted within 24 hours if not verified."
+      : "⏰ Attention : Ton compte sera supprimé dans 24h s'il n'est pas vérifié.",
+    resendBtn:     currentLanguage === "ar" ? "إعادة إرسال بريد التحقق" : currentLanguage === "en" ? "Resend verification email" : "Renvoyer l'email de vérification",
+    resendSuccess: currentLanguage === "ar" ? "تم إرسال بريد التحقق!"   : currentLanguage === "en" ? "Verification email sent!"  : "Email de vérification renvoyé !",
+    resendError:   currentLanguage === "ar" ? "تعذر إرسال البريد. تحقق من بياناتك." : currentLanguage === "en" ? "Could not resend email. Check your credentials." : "Impossible de renvoyer l'email. Vérifie tes identifiants.",
+    selectLang:    currentLanguage === "ar" ? "اختر اللغة" : currentLanguage === "en" ? "Select language" : "Choisir la langue",
   };
 
   const handleLogin = async () => {
@@ -152,12 +157,23 @@ export default function LoginScreen() {
               marginBottom: 20, borderWidth: 1, borderColor: "#FCD34D",
             }}>
               <Text style={{
-                fontSize: 13, color: "#92400E", marginBottom: 10, lineHeight: 20,
+                fontSize: 13, color: "#92400E", marginBottom: 8, lineHeight: 20,
                 textAlign: isRTL ? "right" : "left",
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}>
                 {t.notVerified}
               </Text>
+
+              {/* Message expiration */}
+              <Text style={{
+                fontSize: 12, color: "#EF4444", marginBottom: 12,
+                lineHeight: 18, fontWeight: "600",
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}>
+                {t.expiring}
+              </Text>
+
               <TouchableOpacity
                 onPress={handleResendVerification}
                 disabled={resending}
