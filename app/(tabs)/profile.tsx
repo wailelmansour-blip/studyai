@@ -201,6 +201,27 @@ export default function ProfileScreen() {
           {t("profile_title")}
         </Text>
 
+         {/* Header : titre + sélecteur langue */}
+      <View style={{
+        flexDirection: isRTL ? "row-reverse" : "row",
+        alignItems: "center", justifyContent: "space-between", marginBottom: 24,
+      }}>
+        <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
+          {t("profile_title")}
+        </Text>
+
+        <TouchableOpacity
+          onPress={() => setShowLangModal(true)}
+          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+        >
+          <Text style={{ fontSize: 20 }}>{currentLang?.flag}</Text>
+          <Text style={{ fontSize: 13, color: "#6B7280", fontWeight: "500" }}>
+            {currentLang?.nativeLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color="#6B7280" />
+        </TouchableOpacity>
+      </View>
+
         {/* Avatar */}
         <View style={{ alignItems: "center", marginBottom: 32 }}>
           <View style={{
@@ -454,37 +475,7 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Sélecteur de langue */}
-        <View style={{
-          backgroundColor: "#FFFFFF", borderRadius: 14,
-          borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, overflow: "hidden",
-        }}>
-          <TouchableOpacity
-            onPress={() => setShowLangModal(true)}
-            style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
-              alignItems: "center", padding: 16,
-            }}
-          >
-            <View style={{
-              width: 36, height: 36, borderRadius: 10,
-              backgroundColor: "#EEF2FF15",
-              alignItems: "center", justifyContent: "center",
-              marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
-            }}>
-              <Text style={{ fontSize: 18 }}>{currentLang?.flag}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2, textAlign: isRTL ? "right" : "left" }}>
-                {t("language")}
-              </Text>
-              <Text style={{ fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
-                {currentLang?.nativeLabel}
-              </Text>
-            </View>
-            <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
-          </TouchableOpacity>
-        </View>
+        
 
         {/* ── Section Notifications ── */}
         <Text style={{
