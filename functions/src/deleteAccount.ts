@@ -43,6 +43,19 @@ export const deleteAccount = onCall(async (request) => {
     usageSnap.docs.forEach((d) => usageBatch.delete(d.ref));
     if (!usageSnap.empty) await usageBatch.commit();
 
+    // Supprimer cache IA
+    const cacheSnap = await db.collection("aiCache")
+      .where("userId", "==", uid)
+      .get();
+    if (!cacheSnap.empty) {
+      const cacheBatch = db.batch();
+      cacheSnap.docs.forEach((d) => cacheBatch.delete(d.ref));
+      await cacheBatch.commit();
+    }
+
+    // Supprimer consentement parental
+    await db.collection("parental_consents").doc(uid).delete().catch(() => {});
+
     // Supprimer profil utilisateur
     await db.collection("users").doc(uid).delete().catch(() => {});
 
