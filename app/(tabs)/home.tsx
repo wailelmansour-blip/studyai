@@ -1,5 +1,5 @@
 // app/(tabs)/home.tsx
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
   StatusBar, Dimensions,
@@ -13,7 +13,6 @@ import { useLanguageStore } from "../../store/languageStore";
 import { useUsageStore } from "../../store/usageStore";
 import { LIMITS } from "../../types/usage";
 import { LinearGradient } from "expo-linear-gradient";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
 
 const { width } = Dimensions.get("window");
 
@@ -84,26 +83,16 @@ const FEATURES: FeatureCard[] = [
     emoji: "💬",
   },
 ];
-const { user, firstName: storedFirstName } = useAuthStore();
+
 export default function HomeScreen() {
-  //const { user } = useAuthStore();
+  const { user, firstName: storedFirstName } = useAuthStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const { usage } = useUsageStore();
   const isRTL = currentLanguage === "ar";
 
-  const [firstName, setFirstName] = useState("");
+  const displayName = storedFirstName || user?.email?.split("@")[0] || "Étudiant";
 
-useEffect(() => {
-  if (!user) return;
-  const db = getFirestore();
-  getDoc(doc(db, "users", user.uid)).then((snap) => {
-    if (snap.exists()) setFirstName(snap.data().firstName || "");
-  });
-}, [user]);
-
-
-const displayName = storedFirstName || user?.email?.split("@")[0] || "Étudiant";
   const greeting =
     currentLanguage === "ar" ? `مرحباً، ${displayName} 👋`
     : currentLanguage === "en" ? `Hello, ${displayName} 👋`
@@ -236,28 +225,27 @@ const displayName = storedFirstName || user?.email?.split("@")[0] || "Étudiant"
           flexDirection: "row", flexWrap: "wrap", gap: 12,
         }}>
           {FEATURES.map((feature) => (
-            // APRÈS
-<TouchableOpacity
-  key={feature.route}
-  onPress={() => router.push(feature.route as any)}
-  activeOpacity={0.85}
-  style={{
-    width: (width - 44) / 2,
-    borderRadius: 20, overflow: "hidden",
-    elevation: 4,
-    shadowColor: "#6366F1",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    height: 150, // ← hauteur FIXE identique pour toutes les cartes
-  }}
->
-  <LinearGradient
-    colors={feature.gradient}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={{ flex: 1, padding: 20 }} // ← flex: 1 remplace minHeight
-  >
+            <TouchableOpacity
+              key={feature.route}
+              onPress={() => router.push(feature.route as any)}
+              activeOpacity={0.85}
+              style={{
+                width: (width - 44) / 2,
+                borderRadius: 20, overflow: "hidden",
+                elevation: 4,
+                shadowColor: "#6366F1",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                height: 150,
+              }}
+            >
+              <LinearGradient
+                colors={feature.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ flex: 1, padding: 20 }}
+              >
                 <Text style={{ fontSize: 32, marginBottom: 12 }}>
                   {feature.emoji}
                 </Text>
