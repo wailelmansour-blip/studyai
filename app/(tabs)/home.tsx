@@ -1,5 +1,5 @@
 // app/(tabs)/home.tsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView,
   StatusBar, Dimensions,
@@ -13,6 +13,7 @@ import { useLanguageStore } from "../../store/languageStore";
 import { useUsageStore } from "../../store/usageStore";
 import { LIMITS } from "../../types/usage";
 import { LinearGradient } from "expo-linear-gradient";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 
 const { width } = Dimensions.get("window");
 
@@ -91,7 +92,17 @@ export default function HomeScreen() {
   const { usage } = useUsageStore();
   const isRTL = currentLanguage === "ar";
 
-  const displayName = user?.email?.split("@")[0] || "Étudiant";
+  const [firstName, setFirstName] = useState("");
+
+useEffect(() => {
+  if (!user) return;
+  const db = getFirestore();
+  getDoc(doc(db, "users", user.uid)).then((snap) => {
+    if (snap.exists()) setFirstName(snap.data().firstName || "");
+  });
+}, [user]);
+
+const displayName = firstName || user?.email?.split("@")[0] || "Étudiant";
   const greeting =
     currentLanguage === "ar" ? `مرحباً، ${displayName} 👋`
     : currentLanguage === "en" ? `Hello, ${displayName} 👋`
