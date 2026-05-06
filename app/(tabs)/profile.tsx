@@ -472,7 +472,7 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
-          // Ajoute dans la section profil — après les infos, avant logout
+           {/* ──  Ajoute dans la section profil — après les infos avant logout── */}
 <TouchableOpacity
   onPress={() => router.push("/changePassword")}
   style={{
