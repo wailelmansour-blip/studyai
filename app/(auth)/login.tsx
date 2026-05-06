@@ -116,10 +116,12 @@ export default function LoginScreen() {
     const auth = getAuth(app);
     await sendPasswordResetEmail(auth, email.trim());
     Alert.alert("✅",
-      currentLanguage === "ar" ? "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني."
-      : currentLanguage === "en" ? "Password reset link sent to your email."
-      : "Lien de réinitialisation envoyé à ton email."
-    );
+  currentLanguage === "ar"
+    ? "تم إرسال رابط إعادة تعيين كلمة المرور. تحقق من صندوق الوارد ومجلد البريد العشوائي (Spam)."
+    : currentLanguage === "en"
+    ? "Password reset link sent. Check your inbox and your Spam or Junk folder."
+    : "Lien de réinitialisation envoyé. Vérifie ta boîte mail et ton dossier Spam ou Courrier indésirable."
+);
   } catch (e: any) {
     Alert.alert("", currentLanguage === "ar" ? "تعذر إرسال البريد. تحقق من عنوان بريدك." : currentLanguage === "en" ? "Could not send email. Check your address." : "Impossible d'envoyer l'email. Vérifie ton adresse.");
   }
