@@ -11,7 +11,7 @@ import {
   User,
 } from "firebase/auth";
 import {
-  getFirestore, doc, setDoc,
+  getFirestore, doc, setDoc, getDoc,
 } from "firebase/firestore";
 import app from "../src/config/firebase";
 
@@ -93,6 +93,8 @@ interface AuthState {
   isInitialized: boolean;
   error: string | null;
   lastCreatedUid: string | null;
+  firstName: string | null;
+  setFirstName: (name: string) => void;
   login: (email: string, password: string, lang?: string) => Promise<void>;
   signup: (
     email: string,
@@ -109,12 +111,15 @@ interface AuthState {
   reloadUser: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: false,
   isInitialized: false,
   error: null,
   lastCreatedUid: null,
+  firstName: null,
+
+  setFirstName: (name) => set({ firstName: name }),
 
   initialize: () => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -132,7 +137,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ isLoading: false, error: "email_not_verified" });
         throw new Error("email_not_verified");
       }
-      set({ isLoading: false });
+      // Charger le prénom immédiatement après login
+      const db = getFirestore(app);
+      const snap = await getDoc(doc(db, "users", cred.user.uid));
+      const firstName = snap.exists() ? snap.data().firstName || null : null;
+      set({ isLoading: false, firstName });
     } catch (e: any) {
       const msg = e.message === "email_not_verified"
         ? "email_not_verified"
@@ -168,9 +177,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         createdAt: new Date().toISOString(),
       });
 
-      // Stocker l'uid avant signOut pour le consentement parental
       const uid = cred.user.uid;
-
       await sendEmailVerification(cred.user);
       await signOut(auth);
       set({ isLoading: false, lastCreatedUid: uid });
@@ -185,7 +192,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       await signOut(auth);
-      set({ user: null, isLoading: false, lastCreatedUid: null });
+      set({ user: null, isLoading: false, lastCreatedUid: null, firstName: null });
     } catch (e: any) {
       set({ isLoading: false, error: e.message });
     }

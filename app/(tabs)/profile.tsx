@@ -19,7 +19,7 @@ import { getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuthStore();
+ const { user, logout, setFirstName: setStoreFirstName } = useAuthStore();
   const { currentLanguage, setLanguage } = useLanguageStore();
   const { t } = useTranslation();
   const isRTL = currentLanguage === "ar";
@@ -103,6 +103,7 @@ export default function ProfileScreen() {
         age: ageNum || age,
       });
       setFirstName(editFirstName.trim());
+      setStoreFirstName(editFirstName.trim());
       setLastName(editLastName.trim());
       if (ageNum) setAge(ageNum);
       setEditingProfile(false);

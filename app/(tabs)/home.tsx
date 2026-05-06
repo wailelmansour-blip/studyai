@@ -84,9 +84,9 @@ const FEATURES: FeatureCard[] = [
     emoji: "💬",
   },
 ];
-
+const { user, firstName: storedFirstName } = useAuthStore();
 export default function HomeScreen() {
-  const { user } = useAuthStore();
+  //const { user } = useAuthStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const { usage } = useUsageStore();
@@ -102,7 +102,8 @@ useEffect(() => {
   });
 }, [user]);
 
-const displayName = firstName || user?.email?.split("@")[0] || "Étudiant";
+
+const displayName = storedFirstName || user?.email?.split("@")[0] || "Étudiant";
   const greeting =
     currentLanguage === "ar" ? `مرحباً، ${displayName} 👋`
     : currentLanguage === "en" ? `Hello, ${displayName} 👋`
