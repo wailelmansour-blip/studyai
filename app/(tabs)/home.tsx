@@ -91,12 +91,15 @@ export default function HomeScreen() {
   const { usage } = useUsageStore();
   const isRTL = currentLanguage === "ar";
 
-  const displayName = storedFirstName || user?.email?.split("@")[0] || "Étudiant";
+  const displayName = storedFirstName || "";
 
-  const greeting =
-    currentLanguage === "ar" ? `مرحباً، ${displayName} 👋`
-    : currentLanguage === "en" ? `Hello, ${displayName} 👋`
-    : `Bonjour, ${displayName} 👋`;
+const greeting = storedFirstName
+  ? currentLanguage === "ar" ? `مرحباً، ${storedFirstName} 👋`
+    : currentLanguage === "en" ? `Hello, ${storedFirstName} 👋`
+    : `Bonjour, ${storedFirstName} 👋`
+  : currentLanguage === "ar" ? "مرحباً 👋"
+    : currentLanguage === "en" ? "Hello 👋"
+    : "Bonjour 👋";
 
   const subtitle =
     currentLanguage === "ar" ? "ماذا تريد أن تتعلم اليوم؟"
@@ -154,9 +157,13 @@ export default function HomeScreen() {
                 marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0,
               }}
             >
-              <Text style={{ fontSize: 20, fontWeight: "700", color: "#FFF" }}>
-                {displayName.charAt(0).toUpperCase()}
-              </Text>
+              {storedFirstName ? (
+  <Text style={{ fontSize: 20, fontWeight: "700", color: "#FFF" }}>
+    {storedFirstName.charAt(0).toUpperCase()}
+  </Text>
+) : (
+  <Ionicons name="person-outline" size={22} color="#FFF" />
+)}
             </TouchableOpacity>
           </View>
 
