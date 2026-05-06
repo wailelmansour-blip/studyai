@@ -12,9 +12,10 @@ import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore, LANGUAGES, Language } from "@/store/languageStore";
 import {
   getAuth, signInWithEmailAndPassword,
-  sendEmailVerification, signOut,
+  sendEmailVerification, signOut,sendPasswordResetEmail,
 } from "firebase/auth";
 import app from "@/src/config/firebase";
+
 
 export default function LoginScreen() {
   const params = useLocalSearchParams<{ email?: string; justRegistered?: string }>();
@@ -105,6 +106,24 @@ export default function LoginScreen() {
       setChangingLang(false);
     }
   };
+
+  const handleForgotPassword = async () => {
+  if (!email.trim()) {
+    Alert.alert("", currentLanguage === "ar" ? "أدخل بريدك الإلكتروني أولاً." : currentLanguage === "en" ? "Enter your email first." : "Entre ton email d'abord.");
+    return;
+  }
+  try {
+    const auth = getAuth(app);
+    await sendPasswordResetEmail(auth, email.trim());
+    Alert.alert("✅",
+      currentLanguage === "ar" ? "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني."
+      : currentLanguage === "en" ? "Password reset link sent to your email."
+      : "Lien de réinitialisation envoyé à ton email."
+    );
+  } catch (e: any) {
+    Alert.alert("", currentLanguage === "ar" ? "تعذر إرسال البريد. تحقق من عنوان بريدك." : currentLanguage === "en" ? "Could not send email. Check your address." : "Impossible d'envoyer l'email. Vérifie ton adresse.");
+  }
+};
 
   const currentLang = LANGUAGES.find((l) => l.code === currentLanguage);
 
@@ -246,6 +265,16 @@ export default function LoginScreen() {
               />
             </TouchableOpacity>
           </View>
+
+         {/* Mot de passe oublié */}
+<TouchableOpacity
+  onPress={handleForgotPassword}
+  style={{ alignItems: isRTL ? "flex-start" : "flex-end", marginBottom: 20 }}
+>
+  <Text style={{ fontSize: 13, color: "#6366F1", fontWeight: "600" }}>
+    {currentLanguage === "ar" ? "نسيت كلمة المرور؟" : currentLanguage === "en" ? "Forgot password?" : "Mot de passe oublié ?"}
+  </Text>
+</TouchableOpacity>
 
           {/* Bouton Login */}
           <TouchableOpacity

@@ -70,6 +70,7 @@ export default function RootLayout() {
       <Stack.Screen name="plan" />
       <Stack.Screen name="quiz" />
       <Stack.Screen name="chat" />
+      <Stack.Screen name="changePassword" />
     </Stack>
   );
 }

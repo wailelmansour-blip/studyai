@@ -17,6 +17,7 @@ import { useHistoryStore } from "../../store/historyStore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
+import { router } from "expo-router";
 
 export default function ProfileScreen() {
  const { user, logout, setFirstName: setStoreFirstName } = useAuthStore();
@@ -471,7 +472,28 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
-
+          // Ajoute dans la section profil — après les infos, avant logout
+<TouchableOpacity
+  onPress={() => router.push("/changePassword")}
+  style={{
+    backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
+    flexDirection: isRTL ? "row-reverse" : "row",
+    alignItems: "center",
+    borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16,
+  }}
+>
+  <View style={{
+    width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF",
+    alignItems: "center", justifyContent: "center",
+    marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+  }}>
+    <Ionicons name="lock-closed-outline" size={18} color="#6366F1" />
+  </View>
+  <Text style={{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+    {currentLanguage === "ar" ? "تغيير كلمة المرور" : currentLanguage === "en" ? "Change password" : "Modifier le mot de passe"}
+  </Text>
+  <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
+</TouchableOpacity>
         
 
         {/* ── Section Notifications ── */}
