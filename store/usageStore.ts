@@ -6,22 +6,19 @@ import {
 } from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { UsageRecord, UserPlan, LIMITS } from "../types/usage";
+import { UsageRecord, UserPlan, LIMITS, FILE_LIMITS } from "../types/usage";
 
-const getTodayDate = () => new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+const getTodayDate = () => new Date().toISOString().split("T")[0];
 
 interface UsageState {
   usage: UsageRecord | null;
   isLoading: boolean;
-  // Charge l'usage du jour depuis Firestore
   loadUsage: () => Promise<void>;
-  // Vérifie si l'utilisateur peut encore faire une requête
   canMakeRequest: () => boolean;
-  // Incrémente le compteur ET bloque si dépassé (retourne true si OK)
+  canMakeFileRequest: () => boolean;
   consumeRequest: () => Promise<boolean>;
-  // Upgrade vers premium (admin uniquement en prod, ici direct pour démo)
+  consumeFileRequest: () => Promise<boolean>;
   upgradeToPremium: () => Promise<void>;
-  // Reset pour les tests
   resetUsageForTest: () => Promise<void>;
 }
 
@@ -43,10 +40,11 @@ export const useUsageStore = create<UsageState>((set, get) => ({
       const snap = await getDoc(ref);
 
       if (snap.exists()) {
-        set({ usage: snap.data() as UsageRecord });
+        const data = snap.data() as UsageRecord;
+        // Assurer que fileCount existe
+        if (data.fileCount === undefined) data.fileCount = 0;
+        set({ usage: data });
       } else {
-        // Premier accès aujourd'hui → créer le document
-        // Récupère le plan depuis users/{uid}
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
         const plan: UserPlan = userSnap.exists()
@@ -57,6 +55,7 @@ export const useUsageStore = create<UsageState>((set, get) => ({
           userId: user.uid,
           date: today,
           count: 0,
+          fileCount: 0,
           plan,
           updatedAt: new Date().toISOString(),
         };
@@ -73,8 +72,13 @@ export const useUsageStore = create<UsageState>((set, get) => ({
   canMakeRequest: () => {
     const { usage } = get();
     if (!usage) return false;
-    const limit = LIMITS[usage.plan];
-    return usage.count < limit;
+    return usage.count < LIMITS[usage.plan];
+  },
+
+  canMakeFileRequest: () => {
+    const { usage } = get();
+    if (!usage) return false;
+    return usage.fileCount < FILE_LIMITS[usage.plan];
   },
 
   consumeRequest: async () => {
@@ -84,15 +88,12 @@ export const useUsageStore = create<UsageState>((set, get) => ({
     const user = auth.currentUser;
     if (!user) return false;
 
-    // Recharger l'usage pour avoir la valeur fraîche
     await get().loadUsage();
     const { usage } = get();
     if (!usage) return false;
 
-    const limit = LIMITS[usage.plan];
-    if (usage.count >= limit) return false; // bloqué
+    if (usage.count >= LIMITS[usage.plan]) return false;
 
-    // Incrémenter dans Firestore
     const today = getTodayDate();
     const ref = doc(db, "usage", `${user.uid}_${today}`);
     await updateDoc(ref, {
@@ -100,9 +101,35 @@ export const useUsageStore = create<UsageState>((set, get) => ({
       updatedAt: new Date().toISOString(),
     });
 
-    // Mettre à jour le state local
     set({
       usage: { ...usage, count: usage.count + 1, updatedAt: new Date().toISOString() },
+    });
+
+    return true;
+  },
+
+  consumeFileRequest: async () => {
+    const app = getApp();
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const user = auth.currentUser;
+    if (!user) return false;
+
+    await get().loadUsage();
+    const { usage } = get();
+    if (!usage) return false;
+
+    if (usage.fileCount >= FILE_LIMITS[usage.plan]) return false;
+
+    const today = getTodayDate();
+    const ref = doc(db, "usage", `${user.uid}_${today}`);
+    await updateDoc(ref, {
+      fileCount: increment(1),
+      updatedAt: new Date().toISOString(),
+    });
+
+    set({
+      usage: { ...usage, fileCount: usage.fileCount + 1, updatedAt: new Date().toISOString() },
     });
 
     return true;
@@ -116,27 +143,23 @@ export const useUsageStore = create<UsageState>((set, get) => ({
     if (!user) return;
 
     const today = getTodayDate();
-    // Mettre à jour le plan dans users/{uid}
     const userRef = doc(db, "users", user.uid);
     await setDoc(userRef, { plan: "premium" }, { merge: true });
 
-    // Mettre à jour l'enregistrement usage du jour
     const usageRef = doc(db, "usage", `${user.uid}_${today}`);
     await updateDoc(usageRef, { plan: "premium" }).catch(() => {
-      // Si le doc du jour n'existe pas encore, on le crée
       setDoc(usageRef, {
         userId: user.uid,
         date: today,
         count: 0,
+        fileCount: 0,
         plan: "premium",
         updatedAt: new Date().toISOString(),
       });
     });
 
     const { usage } = get();
-    if (usage) {
-      set({ usage: { ...usage, plan: "premium" } });
-    }
+    if (usage) set({ usage: { ...usage, plan: "premium" } });
   },
 
   resetUsageForTest: async () => {
@@ -148,8 +171,12 @@ export const useUsageStore = create<UsageState>((set, get) => ({
 
     const today = getTodayDate();
     const ref = doc(db, "usage", `${user.uid}_${today}`);
-    await updateDoc(ref, { count: 0, updatedAt: new Date().toISOString() });
+    await updateDoc(ref, {
+      count: 0,
+      fileCount: 0,
+      updatedAt: new Date().toISOString(),
+    });
     const { usage } = get();
-    if (usage) set({ usage: { ...usage, count: 0 } });
+    if (usage) set({ usage: { ...usage, count: 0, fileCount: 0 } });
   },
 }));

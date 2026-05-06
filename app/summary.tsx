@@ -50,7 +50,6 @@ export default function SummaryScreen() {
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
-  const { checkAndConsume } = useAIRequest();
   const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const refreshTrigger = useHistoryStore((state) => state.refreshTrigger["summaries"] || 0);
   const { startTracking, endTracking, trackConv, trackView } = useAnalytics("summary"); // ← AJOUT Phase 17
@@ -66,6 +65,7 @@ export default function SummaryScreen() {
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { checkAndConsume, checkAndConsumeFile } = useAIRequest();
 
   useEffect(() => {
     trackView(); // ← AJOUT Phase 17
@@ -346,6 +346,10 @@ export default function SummaryScreen() {
     setSummary("");
     setIsSaved(false);
     setIsFromCache(false);
+  }}
+  onBeforeImport={async () => {
+    const allowed = await checkAndConsumeFile();
+    return allowed;
   }}
   currentLanguage={currentLanguage}
   isRTL={isRTL}

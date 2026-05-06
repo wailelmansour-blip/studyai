@@ -1,17 +1,12 @@
 // hooks/useAIRequest.ts
 import { Alert } from "react-native";
 import { useUsageStore } from "../store/usageStore";
-import { LIMITS } from "../types/usage";
+import { LIMITS, FILE_LIMITS } from "../types/usage";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 
-/**
- * Hook à utiliser dans TOUS les écrans IA (summary, quiz, explain, solve, flashcards, chat, plan).
- * Avant chaque appel IA, appeler `checkAndConsume()`.
- * Si retourne false → affiche l'alerte et NE PAS appeler la Cloud Function.
- */
 export const useAIRequest = () => {
-  const { usage, consumeRequest, isLoading } = useUsageStore();
+  const { usage, consumeRequest, consumeFileRequest, isLoading } = useUsageStore();
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
 
@@ -34,20 +29,39 @@ export const useAIRequest = () => {
     return `Vous avez utilisé vos ${limit} requêtes du jour.\n\nPlan gratuit : ${LIMITS.free}/jour\nPlan premium : ${LIMITS.premium}/jour\n\nPassez au premium pour plus de requêtes.`;
   };
 
+  const getFileLimitMessage = () => {
+    if (currentLanguage === "ar")
+      return `لقد استخدمت حصتك اليومية من الملفات.\n\nالخطة المجانية: ${FILE_LIMITS.free} ملف/يوم\nالخطة المدفوعة: ${FILE_LIMITS.premium} ملف/يوم\n\nقم بالترقية للحصول على المزيد.`;
+    if (currentLanguage === "en")
+      return `You've used your daily file uploads.\n\nFree plan: ${FILE_LIMITS.free} file/day\nPremium plan: ${FILE_LIMITS.premium} files/day\n\nUpgrade for more.`;
+    return `Vous avez utilisé votre quota de fichiers du jour.\n\nPlan gratuit : ${FILE_LIMITS.free} fichier/jour\nPlan premium : ${FILE_LIMITS.premium} fichiers/jour\n\nPassez au premium pour plus.`;
+  };
+
   const getTitle = () => {
     if (currentLanguage === "ar") return "تم الوصول إلى الحد اليومي";
     if (currentLanguage === "en") return "Daily limit reached";
     return "Limite journalière atteinte";
   };
 
-  /**
-   * Vérifie et consomme une requête.
-   * @returns true si l'appel IA peut continuer, false si bloqué.
-   */
+  const getFileTitle = () => {
+    if (currentLanguage === "ar") return "تم الوصول إلى حد الملفات اليومي";
+    if (currentLanguage === "en") return "Daily file limit reached";
+    return "Limite de fichiers atteinte";
+  };
+
   const checkAndConsume = async (): Promise<boolean> => {
     const allowed = await consumeRequest();
     if (!allowed) {
       Alert.alert(getTitle(), getLimitMessage());
+      return false;
+    }
+    return true;
+  };
+
+  const checkAndConsumeFile = async (): Promise<boolean> => {
+    const allowed = await consumeFileRequest();
+    if (!allowed) {
+      Alert.alert(getFileTitle(), getFileLimitMessage());
       return false;
     }
     return true;
@@ -58,5 +72,6 @@ export const useAIRequest = () => {
     isLoading,
     getRemainingText,
     checkAndConsume,
+    checkAndConsumeFile,
   };
 };

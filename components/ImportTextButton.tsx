@@ -1,7 +1,7 @@
 // components/ImportTextButton.tsx
 import React, { useState } from "react";
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView,
+  View, Text, TouchableOpacity, ActivityIndicator, Alert, Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
@@ -12,12 +12,14 @@ import { getApp } from "firebase/app";
 
 interface Props {
   onTextExtracted: (text: string) => void;
+  onBeforeImport?: () => Promise<boolean>;
   currentLanguage: string;
   isRTL: boolean;
 }
 
 export const ImportTextButton: React.FC<Props> = ({
   onTextExtracted,
+  onBeforeImport,
   currentLanguage,
   isRTL,
 }) => {
@@ -28,20 +30,27 @@ export const ImportTextButton: React.FC<Props> = ({
 
   const getLabel = (key: string) => {
     const labels: Record<string, Record<string, string>> = {
-      import: { fr: " Importer", en: " Import", ar: " استيراد" },//📎
-      pdf: { fr: "📄 Depuis un PDF", en: "📄 From a PDF", ar: "📄 من ملف PDF" },
-      image: { fr: "🖼️ Depuis une image", en: "🖼️ From an image", ar: "🖼️ من صورة" },
-      cancel: { fr: "Annuler", en: "Cancel", ar: "إلغاء" },
-      extracting: { fr: "Extraction en cours...", en: "Extracting...", ar: "جارٍ الاستخراج..." },
-      success: { fr: "Texte extrait avec succès ✅", en: "Text extracted successfully ✅", ar: "تم استخراج النص بنجاح ✅" },
-      error_pdf: { fr: "Impossible de lire ce PDF.", en: "Cannot read this PDF.", ar: "لا يمكن قراءة هذا الملف." },
-      error_image: { fr: "Impossible d'extraire le texte.", en: "Cannot extract text.", ar: "لا يمكن استخراج النص." },
+      import:       { fr: " Importer",                 en: " Import",                      ar: " استيراد" },
+      pdf:          { fr: "📄 Depuis un PDF",           en: "📄 From a PDF",                ar: "📄 من ملف PDF" },
+      image:        { fr: "🖼️ Depuis une image",        en: "🖼️ From an image",             ar: "🖼️ من صورة" },
+      cancel:       { fr: "Annuler",                   en: "Cancel",                       ar: "إلغاء" },
+      extracting:   { fr: "Extraction en cours...",    en: "Extracting...",                ar: "جارٍ الاستخراج..." },
+      success:      { fr: "Texte extrait avec succès ✅", en: "Text extracted successfully ✅", ar: "تم استخراج النص بنجاح ✅" },
+      error_pdf:    { fr: "Impossible de lire ce PDF.", en: "Cannot read this PDF.",        ar: "لا يمكن قراءة هذا الملف." },
+      error_image:  { fr: "Impossible d'extraire le texte.", en: "Cannot extract text.",   ar: "لا يمكن استخراج النص." },
     };
     return labels[key]?.[currentLanguage] || labels[key]?.["fr"] || key;
   };
 
   const handlePDF = async () => {
     setShowModal(false);
+
+    // Vérifier le quota fichiers avant d'ouvrir le picker
+    if (onBeforeImport) {
+      const allowed = await onBeforeImport();
+      if (!allowed) return;
+    }
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: "application/pdf",
@@ -53,12 +62,10 @@ export const ImportTextButton: React.FC<Props> = ({
       const file = result.assets[0];
       setLoading(true);
 
-      // Lire le fichier en base64
       const base64 = await FileSystem.readAsStringAsync(file.uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Appeler la Cloud Function
       const fn = httpsCallable(functions, "extractText");
       const res = await fn({ type: "pdf", base64 });
       const data = res.data as any;
@@ -68,8 +75,8 @@ export const ImportTextButton: React.FC<Props> = ({
         Alert.alert("✅", getLabel("success"));
       }
     } catch (e: any) {
-  console.error("PDF extract error detail:", e?.message, e?.code); // ← AJOUT
-  Alert.alert("Erreur", getLabel("error_pdf"));
+      console.error("PDF extract error detail:", e?.message, e?.code);
+      Alert.alert("Erreur", getLabel("error_pdf"));
     } finally {
       setLoading(false);
     }
@@ -77,8 +84,14 @@ export const ImportTextButton: React.FC<Props> = ({
 
   const handleImage = async () => {
     setShowModal(false);
+
+    // Vérifier le quota fichiers avant d'ouvrir la galerie
+    if (onBeforeImport) {
+      const allowed = await onBeforeImport();
+      if (!allowed) return;
+    }
+
     try {
-      // Demander permission
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission refusée", "Autorise l'accès à la galerie.");
@@ -98,7 +111,6 @@ export const ImportTextButton: React.FC<Props> = ({
 
       setLoading(true);
 
-      // Appeler la Cloud Function
       const fn = httpsCallable(functions, "extractText");
       const res = await fn({
         type: "image",
@@ -112,8 +124,8 @@ export const ImportTextButton: React.FC<Props> = ({
         Alert.alert("✅", getLabel("success"));
       }
     } catch (e: any) {
-  console.error("Image extract error detail:", e?.message, e?.code); // ← AJOUT
-  Alert.alert("Erreur", getLabel("error_image"));
+      console.error("Image extract error detail:", e?.message, e?.code);
+      Alert.alert("Erreur", getLabel("error_image"));
     } finally {
       setLoading(false);
     }
@@ -193,10 +205,10 @@ export const ImportTextButton: React.FC<Props> = ({
                   {getLabel("pdf")}
                 </Text>
                 <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
-  {currentLanguage === "ar" ? "يدعم جميع ملفات PDF"
-    : currentLanguage === "en" ? "Supports all PDF files"
-    : "Supporte tous les PDFs"}
-</Text>
+                  {currentLanguage === "ar" ? "يدعم جميع ملفات PDF"
+                    : currentLanguage === "en" ? "Supports all PDF files"
+                    : "Supporte tous les PDFs"}
+                </Text>
               </View>
               <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color="#6366F1" />
             </TouchableOpacity>
@@ -221,10 +233,10 @@ export const ImportTextButton: React.FC<Props> = ({
                   {getLabel("image")}
                 </Text>
                 <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
-  {currentLanguage === "ar" ? "يدعم جميع أنواع الصور"
-    : currentLanguage === "en" ? "Supports all image types"
-    : "Supporte tous les types d'images"}
-</Text>
+                  {currentLanguage === "ar" ? "يدعم جميع أنواع الصور"
+                    : currentLanguage === "en" ? "Supports all image types"
+                    : "Supporte tous les types d'images"}
+                </Text>
               </View>
               <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color="#10B981" />
             </TouchableOpacity>
