@@ -197,9 +197,6 @@ export default function ProfileScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
 
-        <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 24, textAlign: isRTL ? "right" : "left" }}>
-          {t("profile_title")}
-        </Text>
 
          {/* Header : titre + sélecteur langue */}
       <View style={{
