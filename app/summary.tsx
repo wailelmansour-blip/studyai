@@ -26,7 +26,8 @@ import { useAnalytics } from "../hooks/useAnalytics"; // ← AJOUT Phase 17
 import { useDeleteHistory } from "../hooks/useDeleteHistory";
 import { useHistoryStore } from "../store/historyStore";
 import { ImportTextButton } from "../components/ImportTextButton"; // ← AJOUT
-import { ShareButton } from "../components/ShareButton";
+import { Share } from "react-native";
+import * as Clipboard from "expo-clipboard";
 
 
 const CACHE_KEY = "studyai_summaries";
@@ -400,71 +401,101 @@ export default function SummaryScreen() {
         </TouchableOpacity>
 
         {/* Résultat */}
-        {summary !== "" && (
-          <View>
-            <View style={{
-              backgroundColor: "#EEF2FF", borderRadius: 14, padding: 16,
-              marginBottom: 16,
-              borderLeftWidth: isRTL ? 0 : 4,
-              borderRightWidth: isRTL ? 4 : 0,
-              borderLeftColor: "#6366F1",
-              borderRightColor: "#6366F1",
-            }} >
-              <Text style={{
-                fontSize: 14, fontWeight: "700", color: "#3730A3", marginBottom: 8,
-                textAlign: isRTL ? "right" : "left",
-              }}>
-                📋 {t("summary_result")}
-              </Text>
-              <Text style={{
-                fontSize: 14, color: "#3730A3", lineHeight: 22,
-                textAlign: isRTL ? "right" : "left",
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}>
-                {summary}
-              </Text>
-            </View>
+{summary !== "" && (
+  <View>
+    <View style={{
+      backgroundColor: "#EEF2FF", borderRadius: 14, padding: 16,
+      marginBottom: 16,
+      borderLeftWidth: isRTL ? 0 : 4,
+      borderRightWidth: isRTL ? 4 : 0,
+      borderLeftColor: "#6366F1",
+      borderRightColor: "#6366F1",
+    }}>
+      <Text style={{
+        fontSize: 14, fontWeight: "700", color: "#3730A3", marginBottom: 8,
+        textAlign: isRTL ? "right" : "left",
+      }}>
+        📋 {t("summary_result")}
+      </Text>
+      <Text style={{
+        fontSize: 14, color: "#3730A3", lineHeight: 22,
+        textAlign: isRTL ? "right" : "left",
+        writingDirection: isRTL ? "rtl" : "ltr",
+      }}>
+        {summary}
+      </Text>
+    </View>
 
-            <ShareButton
-      content={summary}
-      title={currentLanguage === "ar" ? "📋 ملخص — StudyAI"
-        : currentLanguage === "en" ? "📋 Summary — StudyAI"
-        : "📋 Résumé — StudyAI"}
-      currentLanguage={currentLanguage}
-      isRTL={isRTL}
-    />
+    {/* Actions principales */}
+    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12, marginBottom: 12 }}>
+      <TouchableOpacity
+        onPress={() => {
+          setSummary(""); setInputText("");
+          setIsSaved(false); setIsFromCache(false);
+        }}
+        style={{
+          flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+          backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+        }}
+      >
+        <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
+          🔄 {t("new")}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={handleSave}
+        disabled={isSaved}
+        style={{
+          flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+          backgroundColor: isSaved ? "#10B981" : "#6366F1",
+        }}
+      >
+        <Text style={{ fontWeight: "600", color: "#FFF", fontSize: 15 }}>
+          {isSaved ? `✅ ${t("saved")}` : `💾 ${t("save")}`}
+        </Text>
+      </TouchableOpacity>
+    </View>
 
-            {/* Actions */}
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  setSummary(""); setInputText("");
-                  setIsSaved(false); setIsFromCache(false);
-                }}
-                style={{
-                  flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
-                  backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
-                }}
-              >
-                <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
-                  🔄 {t("new")}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSave}
-                disabled={isSaved}
-                style={{
-                  flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
-                  backgroundColor: isSaved ? "#10B981" : "#6366F1",
-                }}
-              >
-                <Text style={{ fontWeight: "600", color: "#FFF", fontSize: 15 }}>
-                  {isSaved ? `✅ ${t("saved")}` : `💾 ${t("save")}`}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+    {/* Actions secondaires — Copier / Partager */}
+    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
+      <TouchableOpacity
+        onPress={async () => {
+          await Clipboard.setStringAsync(summary);
+          Alert.alert("✅", currentLanguage === "ar" ? "تم النسخ!"
+            : currentLanguage === "en" ? "Copied!" : "Copié !");
+        }}
+        style={{
+          flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+          flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "center", gap: 6,
+          backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+        }}
+      >
+        <Ionicons name="copy-outline" size={16} color="#374151" />
+        <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
+          {currentLanguage === "ar" ? "نسخ" : currentLanguage === "en" ? "Copy" : "Copier"}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={async () => {
+          await Share.share({
+            message: `📋 ${currentLanguage === "ar" ? "ملخص" : currentLanguage === "en" ? "Summary" : "Résumé"} — StudyAI\n\n${summary}`,
+          });
+        }}
+        style={{
+          flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+          flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "center", gap: 6,
+          backgroundColor: "#EEF2FF", borderWidth: 1, borderColor: "#C7D2FE",
+        }}
+      >
+        <Ionicons name="share-social-outline" size={16} color="#6366F1" />
+        <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 15 }}>
+          {currentLanguage === "ar" ? "مشاركة" : currentLanguage === "en" ? "Share" : "Partager"}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
 
         {/* Historique */}
         {cachedSummaries.length > 0 && summary === "" && (
