@@ -16,14 +16,17 @@ import { useDeleteHistory, HistoryType } from "../../hooks/useDeleteHistory";
 import { useHistoryStore } from "../../store/historyStore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { router } from "expo-router";
+import { useUsageStore } from "../../store/usageStore";
+import { LIMITS, FILE_LIMITS } from "../../types/usage";
 
 export default function ProfileScreen() {
- const { user, logout, setFirstName: setStoreFirstName } = useAuthStore();
+  const { user, logout, setFirstName: setStoreFirstName } = useAuthStore();
   const { currentLanguage, setLanguage } = useLanguageStore();
   const { t } = useTranslation();
   const isRTL = currentLanguage === "ar";
+  const { usage } = useUsageStore();
 
   const [showLangModal, setShowLangModal] = useState(false);
   const [changingLang, setChangingLang] = useState(false);
@@ -40,12 +43,17 @@ export default function ProfileScreen() {
   const [editLastName, setEditLastName] = useState("");
   const [editAge, setEditAge] = useState("");
 
+  // ── Statistiques ──
+  const [totalQuizzes, setTotalQuizzes] = useState(0);
+  const [totalSummaries, setTotalSummaries] = useState(0);
+  const [totalSolutions, setTotalSolutions] = useState(0);
+  const [loadingStats, setLoadingStats] = useState(true);
+
   const { confirmDeleteAll } = useDeleteHistory();
   const { triggerRefresh } = useHistoryStore();
   const functions = getFunctions(getApp(), "us-central1");
   const db = getFirestore(getApp());
 
-  // ── Phase 16 ──
   const {
     settings, hasPermission, loadSettings,
     toggleEnabled, toggleStudyReminder, togglePlanAlerts,
@@ -59,6 +67,7 @@ export default function ProfileScreen() {
     loadSettings(currentLanguage);
     checkPermission();
     loadProfile();
+    loadStats();
   }, []);
 
   const loadProfile = async () => {
@@ -76,6 +85,28 @@ export default function ProfileScreen() {
       console.log("loadProfile error:", e);
     } finally {
       setLoadingProfile(false);
+    }
+  };
+
+  const loadStats = async () => {
+    if (!user) return;
+    setLoadingStats(true);
+    try {
+      const collections = [
+        { name: "quizzes", setter: setTotalQuizzes },
+        { name: "summaries", setter: setTotalSummaries },
+        { name: "solutions", setter: setTotalSolutions },
+      ];
+      for (const col of collections) {
+        const snap = await getDocs(
+          query(collection(db, col.name), where("userId", "==", user.uid))
+        );
+        col.setter(snap.size);
+      }
+    } catch (e) {
+      console.log("loadStats error:", e);
+    } finally {
+      setLoadingStats(false);
     }
   };
 
@@ -121,6 +152,14 @@ export default function ProfileScreen() {
 
   const getLabel = (fr: string, en: string, ar: string) =>
     currentLanguage === "ar" ? ar : currentLanguage === "en" ? en : fr;
+
+  const isPremium = usage?.plan === "premium";
+  const usageCount = usage?.count || 0;
+  const usageLimit = usage ? LIMITS[usage.plan] : LIMITS.free;
+  const fileCount = usage?.fileCount || 0;
+  const fileLimit = usage ? FILE_LIMITS[usage.plan] : FILE_LIMITS.free;
+  const usagePercent = Math.min(100, (usageCount / usageLimit) * 100);
+  const filePercent = Math.min(100, (fileCount / fileLimit) * 100);
 
   const deleteLabels = {
     title:    getLabel("Supprimer le compte",               "Delete Account",                  "حذف الحساب"),
@@ -198,30 +237,28 @@ export default function ProfileScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
 
-
-         {/* Header : titre + sélecteur langue */}
-      <View style={{
-        flexDirection: isRTL ? "row-reverse" : "row",
-        alignItems: "center", justifyContent: "space-between", marginBottom: 24,
-      }}>
-        <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
-          {t("profile_title")}
-        </Text>
-
-        <TouchableOpacity
-          onPress={() => setShowLangModal(true)}
-          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-        >
-          <Text style={{ fontSize: 20 }}>{currentLang?.flag}</Text>
-          <Text style={{ fontSize: 13, color: "#6B7280", fontWeight: "500" }}>
-            {currentLang?.nativeLabel}
+        {/* Header : titre + sélecteur langue */}
+        <View style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          alignItems: "center", justifyContent: "space-between", marginBottom: 24,
+        }}>
+          <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
+            {t("profile_title")}
           </Text>
-          <Ionicons name="chevron-down" size={14} color="#6B7280" />
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            onPress={() => setShowLangModal(true)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+          >
+            <Text style={{ fontSize: 20 }}>{currentLang?.flag}</Text>
+            <Text style={{ fontSize: 13, color: "#6B7280", fontWeight: "500" }}>
+              {currentLang?.nativeLabel}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
 
-        {/* Avatar */}
-        <View style={{ alignItems: "center", marginBottom: 32 }}>
+        {/* Avatar + nom */}
+        <View style={{ alignItems: "center", marginBottom: 24 }}>
           <View style={{
             width: 80, height: 80, borderRadius: 40, backgroundColor: "#EEF2FF",
             alignItems: "center", justifyContent: "center", marginBottom: 12,
@@ -245,7 +282,150 @@ export default function ProfileScreen() {
               {age} {profileLabels.years}
             </Text>
           )}
+
+          {/* Badge plan */}
+          <View style={{
+            marginTop: 10,
+            backgroundColor: isPremium ? "#FEF3C7" : "#EEF2FF",
+            borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6,
+            borderWidth: 1,
+            borderColor: isPremium ? "#FCD34D" : "#C7D2FE",
+          }}>
+            <Text style={{
+              fontSize: 13, fontWeight: "700",
+              color: isPremium ? "#92400E" : "#3730A3",
+            }}>
+              {isPremium
+                ? "✨ PREMIUM"
+                : getLabel("Plan Gratuit", "Free Plan", "الخطة المجانية")}
+            </Text>
+          </View>
         </View>
+
+        {/* ── Section Statistiques ── */}
+        <Text style={{
+          fontSize: 15, fontWeight: "700", color: "#111827",
+          marginBottom: 12, textAlign: isRTL ? "right" : "left",
+        }}>
+          📊 {getLabel("Statistiques", "Statistics", "الإحصائيات")}
+        </Text>
+
+        {/* Cartes stats */}
+        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10, marginBottom: 16 }}>
+          {[
+            { label: getLabel("Quiz", "Quizzes", "اختبارات"), value: totalQuizzes, icon: "🧠", color: "#EC4899" },
+            { label: getLabel("Résumés", "Summaries", "ملخصات"), value: totalSummaries, icon: "📄", color: "#6366F1" },
+            { label: getLabel("Solutions", "Solutions", "حلول"), value: totalSolutions, icon: "✏️", color: "#10B981" },
+          ].map((stat) => (
+            <View key={stat.label} style={{
+              flex: 1, backgroundColor: "#FFFFFF", borderRadius: 14,
+              padding: 14, alignItems: "center",
+              borderWidth: 1, borderColor: "#F3F4F6",
+            }}>
+              <Text style={{ fontSize: 22, marginBottom: 4 }}>{stat.icon}</Text>
+              {loadingStats ? (
+                <ActivityIndicator size="small" color={stat.color} />
+              ) : (
+                <Text style={{ fontSize: 22, fontWeight: "800", color: stat.color }}>
+                  {stat.value}
+                </Text>
+              )}
+              <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2, textAlign: "center" }}>
+                {stat.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Section Usage du jour ── */}
+        <View style={{
+          backgroundColor: "#FFFFFF", borderRadius: 14,
+          borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, padding: 16,
+        }}>
+          <Text style={{
+            fontSize: 13, fontWeight: "700", color: "#6B7280",
+            letterSpacing: 0.5, marginBottom: 14,
+            textAlign: isRTL ? "right" : "left",
+          }}>
+            ⚡ {getLabel("UTILISATION DU JOUR", "TODAY'S USAGE", "الاستخدام اليومي")}
+          </Text>
+
+          {/* Requêtes IA */}
+          <View style={{ marginBottom: 12 }}>
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              justifyContent: "space-between", marginBottom: 6,
+            }}>
+              <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>
+                {getLabel("Requêtes IA", "AI Requests", "طلبات الذكاء الاصطناعي")}
+              </Text>
+              <Text style={{ fontSize: 13, color: "#6B7280" }}>
+                {usageCount} / {usageLimit}
+              </Text>
+            </View>
+            <View style={{ height: 8, backgroundColor: "#F3F4F6", borderRadius: 4, overflow: "hidden" }}>
+              <View style={{
+                height: 8,
+                width: `${usagePercent}%`,
+                backgroundColor: usagePercent >= 100 ? "#EF4444" : isPremium ? "#F59E0B" : "#6366F1",
+                borderRadius: 4,
+              }} />
+            </View>
+          </View>
+
+          {/* Fichiers */}
+          <View>
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              justifyContent: "space-between", marginBottom: 6,
+            }}>
+              <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>
+                {getLabel("Fichiers importés", "Imported files", "الملفات المستوردة")}
+              </Text>
+              <Text style={{ fontSize: 13, color: "#6B7280" }}>
+                {fileCount} / {fileLimit}
+              </Text>
+            </View>
+            <View style={{ height: 8, backgroundColor: "#F3F4F6", borderRadius: 4, overflow: "hidden" }}>
+              <View style={{
+                height: 8,
+                width: `${filePercent}%`,
+                backgroundColor: filePercent >= 100 ? "#EF4444" : "#10B981",
+                borderRadius: 4,
+              }} />
+            </View>
+          </View>
+        </View>
+
+        {/* ── Bouton Upgrade Premium ── */}
+        {!isPremium && (
+          <TouchableOpacity
+            style={{
+              borderRadius: 14, padding: 16, marginBottom: 16,
+              alignItems: "center",
+              backgroundColor: "#6366F1",
+            }}
+            onPress={() => Alert.alert(
+              getLabel("Passer au Premium ✨", "Upgrade to Premium ✨", "الترقية إلى Premium ✨"),
+              getLabel(
+                `Débloquez ${LIMITS.premium} requêtes/jour et ${FILE_LIMITS.premium} fichiers/jour.\n\nContactez-nous pour plus d'informations.`,
+                `Unlock ${LIMITS.premium} requests/day and ${FILE_LIMITS.premium} files/day.\n\nContact us for more information.`,
+                `افتح ${LIMITS.premium} طلب/يوم و${FILE_LIMITS.premium} ملف/يوم.\n\nتواصل معنا للمزيد من المعلومات.`
+              )
+            )}
+          >
+            <Text style={{ fontSize: 15, fontWeight: "700", color: "#FFF" }}>
+              ✨ {getLabel("Passer au Premium", "Upgrade to Premium", "الترقية إلى Premium")}
+            </Text>
+            <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 4 }}>
+              {getLabel(
+                `${LIMITS.premium} requêtes · ${FILE_LIMITS.premium} fichiers par jour`,
+                `${LIMITS.premium} requests · ${FILE_LIMITS.premium} files per day`,
+                `${LIMITS.premium} طلب · ${FILE_LIMITS.premium} ملف يومياً`
+              )}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* ── Section Profil ── */}
         <View style={{
@@ -271,7 +451,6 @@ export default function ProfileScreen() {
 
           {editingProfile ? (
             <View style={{ padding: 16 }}>
-              {/* Edit Prénom */}
               <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
                 {profileLabels.firstName}
               </Text>
@@ -285,8 +464,6 @@ export default function ProfileScreen() {
                   borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", marginBottom: 12,
                 }}
               />
-
-              {/* Edit Nom */}
               <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
                 {profileLabels.lastName}
               </Text>
@@ -300,8 +477,6 @@ export default function ProfileScreen() {
                   borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", marginBottom: 12,
                 }}
               />
-
-              {/* Edit Âge */}
               <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
                 {profileLabels.age}
               </Text>
@@ -316,20 +491,14 @@ export default function ProfileScreen() {
                   borderRadius: 10, padding: 12, fontSize: 15, color: "#111827", marginBottom: 16,
                 }}
               />
-
-              {/* Email (lecture seule) */}
               <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
                 {profileLabels.email} — <Text style={{ color: "#D1D5DB" }}>{profileLabels.emailNote}</Text>
               </Text>
-              <View style={{
-                backgroundColor: "#F3F4F6", borderRadius: 10, padding: 12, marginBottom: 20,
-              }}>
+              <View style={{ backgroundColor: "#F3F4F6", borderRadius: 10, padding: 12, marginBottom: 20 }}>
                 <Text style={{ fontSize: 15, color: "#9CA3AF", textAlign: isRTL ? "right" : "left" }}>
                   {user?.email}
                 </Text>
               </View>
-
-              {/* Boutons */}
               <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
                 <TouchableOpacity
                   onPress={() => setEditingProfile(false)}
@@ -472,29 +641,29 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
-           {/* ──  Ajoute dans la section profil — après les infos avant logout── */}
-<TouchableOpacity
-  onPress={() => router.push("/changePassword")}
-  style={{
-    backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
-    flexDirection: isRTL ? "row-reverse" : "row",
-    alignItems: "center",
-    borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16,
-  }}
->
-  <View style={{
-    width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF",
-    alignItems: "center", justifyContent: "center",
-    marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
-  }}>
-    <Ionicons name="lock-closed-outline" size={18} color="#6366F1" />
-  </View>
-  <Text style={{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
-    {currentLanguage === "ar" ? "تغيير كلمة المرور" : currentLanguage === "en" ? "Change password" : "Modifier le mot de passe"}
-  </Text>
-  <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
-</TouchableOpacity>
-        
+
+        {/* Modifier mot de passe */}
+        <TouchableOpacity
+          onPress={() => router.push("/changePassword")}
+          style={{
+            backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center",
+            borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16,
+          }}
+        >
+          <View style={{
+            width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF",
+            alignItems: "center", justifyContent: "center",
+            marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
+          }}>
+            <Ionicons name="lock-closed-outline" size={18} color="#6366F1" />
+          </View>
+          <Text style={{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+            {getLabel("Modifier le mot de passe", "Change password", "تغيير كلمة المرور")}
+          </Text>
+          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
+        </TouchableOpacity>
 
         {/* ── Section Notifications ── */}
         <Text style={{
