@@ -9,6 +9,8 @@ import { useNotificationStore } from "../store/notificationStore";
 import * as Notifications from "expo-notifications";
 import { useLanguageStore } from "../store/languageStore";
 import { trackConversion } from "../services/analytics";
+import { View, Text, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 LogBox.ignoreLogs([
   "Do not call Hooks inside useEffect",
@@ -57,8 +59,24 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
-  if (!isInitialized) return null;
-
+  
+if (!isInitialized) {
+  return (
+    <View style={{ flex: 1, backgroundColor: "#F8F9FA", alignItems: "center", justifyContent: "center" }}>
+      <View style={{
+        width: 72, height: 72, borderRadius: 20,
+        backgroundColor: "#6366F1", alignItems: "center",
+        justifyContent: "center", marginBottom: 24,
+      }}>
+        <Ionicons name="school" size={36} color="#FFFFFF" />
+      </View>
+      <Text style={{ fontSize: 28, fontWeight: "800", color: "#111827", marginBottom: 8 }}>
+        StudyAI
+      </Text>
+      <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 16 }} />
+    </View>
+  );
+}
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
