@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  ScrollView, ActivityIndicator, Alert,
+  ScrollView, ActivityIndicator, Alert, Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +15,7 @@ import {
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Clipboard from "expo-clipboard";
 import { SolveResult } from "../types/ai";
 import { useAiStore } from "../store/aiStore";
 import { useTranslation } from "react-i18next";
@@ -24,12 +25,11 @@ import { UsageBanner } from "../components/UsageBanner";
 import { readAICache, writeAICache } from "../store/aiCacheStore";
 import { limitInput, getTruncationMessage } from "../utils/inputLimiter";
 import { useAnalytics } from "../hooks/useAnalytics";
-import { useDeleteHistory } from "../hooks/useDeleteHistory"; // ← AJOUT Phase 17
+import { useDeleteHistory } from "../hooks/useDeleteHistory";
 import { ImportTextButton } from "../components/ImportTextButton";
 import { useHistoryStore } from "../store/historyStore";
 
 const CACHE_KEY = "studyai_solutions";
-const CACHE_TTL = 24 * 60 * 60 * 1000;
 const MAX_CACHE_ITEMS = 10;
 const PAGE_SIZE = 5;
 
@@ -54,72 +54,67 @@ export default function SolveScreen() {
   const isRTL = currentLanguage === "ar";
   const { confirmDeleteOne, confirmDeleteAll } = useDeleteHistory();
   const refreshTrigger = useHistoryStore((state) => state.refreshTrigger["solutions"] || 0);
-  const { startTracking, endTracking, trackConv, trackView } = useAnalytics("solve"); // ← AJOUT Phase 17
+  const { startTracking, endTracking, trackConv, trackView } = useAnalytics("solve");
+  const { checkAndConsume, checkAndConsumeFile } = useAIRequest();
 
   const [exercise, setExercise] = useState("");
   const [subject, setSubject] = useState("");
   const [result, setResult] = useState<SolveResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
-
   const [cachedSolutions, setCachedSolutions] = useState<CachedSolution[]>([]);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const { checkAndConsume, checkAndConsumeFile } = useAIRequest();
 
   useEffect(() => {
-    trackView(); // ← AJOUT Phase 17
-
+    trackView();
     const loadCache = async () => {
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-    // 1. Afficher le cache local immédiatement (UX rapide)
-    const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
-    if (raw) {
-      const { data } = JSON.parse(raw);
-      if (data?.length > 0) {
-        setCachedSolutions(data);
-        setHasMore(data.length >= PAGE_SIZE);
+        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const { data } = JSON.parse(raw);
+          if (data?.length > 0) {
+            setCachedSolutions(data);
+            setHasMore(data.length >= PAGE_SIZE);
+          }
+        }
+
+        const q = query(
+          collection(db, "solutions"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+
+        const fromFirestore: CachedSolution[] = snap.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          exercise: doc.data().exercise || "",
+          solution: doc.data().solution || "",
+          steps: doc.data().steps || [],
+          subject: doc.data().subject || "",
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+
+        setCachedSolutions(fromFirestore);
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+
+        await AsyncStorage.setItem(
+          `${CACHE_KEY}_${user.uid}`,
+          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+        );
+      } catch (e) {
+        console.log("Solve cache load error:", e);
       }
-    }
-
-    // 2. Toujours charger Firestore pour avoir les données à jour
-    const q = query(
-      collection(db, "solutions"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(PAGE_SIZE)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) return;
-
-    const fromFirestore: CachedSolution[] = snap.docs.map((doc) => ({
-      id: doc.id,
-      userId: doc.data().userId,
-      exercise: doc.data().exercise || "",
-      solution: doc.data().solution || "",
-      steps: doc.data().steps || [],
-      subject: doc.data().subject || "",
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-    }));
-
-    // 3. Mettre à jour UI + cache avec données Firestore
-    setCachedSolutions(fromFirestore);
-    setLastDoc(snap.docs[snap.docs.length - 1]);
-    setHasMore(snap.docs.length === PAGE_SIZE);
-
-    await AsyncStorage.setItem(
-      `${CACHE_KEY}_${user.uid}`,
-      JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
-    );
-  } catch (e) {
-    console.log("Solve cache load error:", e);
-  }
-};
+    };
     loadCache();
   }, [refreshTrigger]);
 
@@ -210,7 +205,7 @@ export default function SolveScreen() {
     const cacheInput = { exercise: limitedExercise, subject, language: currentLanguage };
     const cached = await readAICache("solve", cacheInput);
     if (cached) {
-      endTracking(true, true); // ← AJOUT Phase 17 — cache hit
+      endTracking(true, true);
       setResult({
         userId: auth.currentUser?.uid || "anonymous",
         exercise,
@@ -222,7 +217,7 @@ export default function SolveScreen() {
       return;
     }
 
-    startTracking(); // ← AJOUT Phase 17
+    startTracking();
     setGenerating(true);
     setResult(null);
     setSaved(false);
@@ -239,9 +234,9 @@ export default function SolveScreen() {
         createdAt: new Date().toISOString(),
       });
       await writeAICache("solve", cacheInput, data);
-      endTracking(true); // ← AJOUT Phase 17 — succès
+      endTracking(true);
     } catch (e: any) {
-      endTracking(false); // ← AJOUT Phase 17 — échec
+      endTracking(false);
       Alert.alert(t("error"), e.message || "La résolution a échoué.");
     } finally {
       setGenerating(false);
@@ -250,23 +245,19 @@ export default function SolveScreen() {
 
   const handleSave = async () => {
     if (!result) return;
-
     const user = auth.currentUser;
     if (!user) {
-      Alert.alert(
-        t("error"),
+      Alert.alert(t("error"),
         currentLanguage === "ar" ? "يجب تسجيل الدخول للحفظ"
         : currentLanguage === "en" ? "You must be logged in to save"
         : "Tu dois être connecté pour sauvegarder."
       );
       return;
     }
-
     try {
       await saveSolution(result);
       setSaved(true);
-      trackConv("first_save"); // ← AJOUT Phase 17
-
+      trackConv("first_save");
       const newEntry: CachedSolution = {
         id: Date.now().toString(),
         userId: user.uid,
@@ -283,12 +274,9 @@ export default function SolveScreen() {
         `${CACHE_KEY}_${user.uid}`,
         JSON.stringify({ data: updated, timestamp: Date.now() })
       );
-
       Alert.alert("✅", t("saved"));
     } catch (e: any) {
-      console.error("Erreur sauvegarde solution:", e);
-      Alert.alert(
-        t("error"),
+      Alert.alert(t("error"),
         currentLanguage === "ar"
           ? `فشل الحفظ.\n\n${e?.message || e?.code || "خطأ غير معروف"}`
           : currentLanguage === "en"
@@ -296,6 +284,14 @@ export default function SolveScreen() {
           : `La sauvegarde a échoué.\n\n${e?.message || e?.code || "Erreur inconnue"}`
       );
     }
+  };
+
+  const getShareContent = () => {
+    if (!result) return "";
+    const stepsText = result.steps.length > 0
+      ? result.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")
+      : "";
+    return `✏️ ${currentLanguage === "ar" ? "الحل" : currentLanguage === "en" ? "Solution" : "Solution"} — StudyAI\n\n📚 ${result.subject}\n\n${stepsText ? (currentLanguage === "ar" ? "الخطوات:\n" : currentLanguage === "en" ? "Steps:\n" : "Étapes:\n") + stepsText + "\n\n" : ""}✅ ${result.solution}`;
   };
 
   return (
@@ -313,16 +309,10 @@ export default function SolveScreen() {
             onPress={() => router.back()}
             style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
           >
-            <Ionicons
-              name={isRTL ? "arrow-forward" : "arrow-back"}
-              size={24} color="#374151"
-            />
+            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
           </TouchableOpacity>
           <View>
-            <Text style={{
-              fontSize: 22, fontWeight: "700", color: "#111827",
-              textAlign: isRTL ? "right" : "left",
-            }}>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
               {t("solve_title_screen")}
             </Text>
             <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
@@ -338,13 +328,9 @@ export default function SolveScreen() {
           fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10,
           textAlign: isRTL ? "right" : "left",
         }}>
-          📚 {t("solve_title_screen").includes("Solve") ? "Subject" : currentLanguage === "ar" ? "المادة" : "Matière"}
+          📚 {currentLanguage === "ar" ? "المادة" : currentLanguage === "en" ? "Subject" : "Matière"}
         </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 20 }}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
           <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
             {SUBJECTS.map((s) => (
               <TouchableOpacity
@@ -356,10 +342,7 @@ export default function SolveScreen() {
                   borderWidth: 1, borderColor: subject === s ? "#6366F1" : "#E5E7EB",
                 }}
               >
-                <Text style={{
-                  fontSize: 14, fontWeight: "500",
-                  color: subject === s ? "#FFFFFF" : "#374151",
-                }}>
+                <Text style={{ fontSize: 14, fontWeight: "500", color: subject === s ? "#FFFFFF" : "#374151" }}>
                   {s}
                 </Text>
               </TouchableOpacity>
@@ -375,19 +358,12 @@ export default function SolveScreen() {
           ✏️ {t("exercise_input")}
         </Text>
 
-<ImportTextButton
-  onTextExtracted={(text) => {
-    setExercise(text);
-    setResult(null);
-    setSaved(false);
-  }}
-  onBeforeImport={async () => {
-    const allowed = await checkAndConsumeFile();
-    return allowed;
-  }}
-  currentLanguage={currentLanguage}
-  isRTL={isRTL}
-/>
+        <ImportTextButton
+          onTextExtracted={(text) => { setExercise(text); setResult(null); setSaved(false); }}
+          onBeforeImport={async () => { const allowed = await checkAndConsumeFile(); return allowed; }}
+          currentLanguage={currentLanguage}
+          isRTL={isRTL}
+        />
 
         <TextInput
           value={exercise}
@@ -405,7 +381,7 @@ export default function SolveScreen() {
           }}
         />
 
-        {/* Bouton */}
+        {/* Bouton Résoudre */}
         <TouchableOpacity
           onPress={handleSolve}
           disabled={generating}
@@ -435,20 +411,19 @@ export default function SolveScreen() {
         {/* Résultat */}
         {result && (
           <View>
+            {/* Badge matière */}
             <View style={{
               flexDirection: isRTL ? "row-reverse" : "row",
               alignItems: "center", marginBottom: 14,
             }}>
-              <View style={{
-                backgroundColor: "#EEF2FF", borderRadius: 8,
-                paddingHorizontal: 12, paddingVertical: 6,
-              }}>
+              <View style={{ backgroundColor: "#EEF2FF", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
                 <Text style={{ fontSize: 13, fontWeight: "600", color: "#6366F1" }}>
                   📚 {result.subject}
                 </Text>
               </View>
             </View>
 
+            {/* Étapes */}
             {result.steps.length > 0 && (
               <View style={{
                 backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
@@ -470,13 +445,9 @@ export default function SolveScreen() {
                     <View style={{
                       width: 24, height: 24, borderRadius: 12, backgroundColor: "#6366F1",
                       alignItems: "center", justifyContent: "center",
-                      marginRight: isRTL ? 0 : 10,
-                      marginLeft: isRTL ? 10 : 0,
-                      flexShrink: 0,
+                      marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0, flexShrink: 0,
                     }}>
-                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFF" }}>
-                        {i + 1}
-                      </Text>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFF" }}>{i + 1}</Text>
                     </View>
                     <Text style={{
                       fontSize: 13, color: "#374151", flex: 1, lineHeight: 20,
@@ -490,13 +461,11 @@ export default function SolveScreen() {
               </View>
             )}
 
+            {/* Solution finale */}
             <View style={{
-              backgroundColor: "#F0FDF4", borderRadius: 14, padding: 16,
-              marginBottom: 16,
-              borderLeftWidth: isRTL ? 0 : 4,
-              borderRightWidth: isRTL ? 4 : 0,
-              borderLeftColor: "#10B981",
-              borderRightColor: "#10B981",
+              backgroundColor: "#F0FDF4", borderRadius: 14, padding: 16, marginBottom: 16,
+              borderLeftWidth: isRTL ? 0 : 4, borderRightWidth: isRTL ? 4 : 0,
+              borderLeftColor: "#10B981", borderRightColor: "#10B981",
             }}>
               <Text style={{
                 fontSize: 14, fontWeight: "700", color: "#065F46", marginBottom: 8,
@@ -513,7 +482,8 @@ export default function SolveScreen() {
               </Text>
             </View>
 
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
+            {/* Actions principales */}
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12, marginBottom: 12 }}>
               <TouchableOpacity
                 onPress={() => { setResult(null); setSaved(false); setExercise(""); }}
                 style={{
@@ -542,41 +512,78 @@ export default function SolveScreen() {
                 )}
               </TouchableOpacity>
             </View>
+
+            {/* Actions secondaires — Copier / Partager */}
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  await Clipboard.setStringAsync(getShareContent());
+                  Alert.alert("✅", currentLanguage === "ar" ? "تم النسخ!"
+                    : currentLanguage === "en" ? "Copied!" : "Copié !");
+                }}
+                style={{
+                  flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+                  flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "center", gap: 6,
+                  backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+                }}
+              >
+                <Ionicons name="copy-outline" size={16} color="#374151" />
+                <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
+                  {currentLanguage === "ar" ? "نسخ" : currentLanguage === "en" ? "Copy" : "Copier"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  await Share.share({ message: getShareContent() });
+                }}
+                style={{
+                  flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+                  flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "center", gap: 6,
+                  backgroundColor: "#EEF2FF", borderWidth: 1, borderColor: "#C7D2FE",
+                }}
+              >
+                <Ionicons name="share-social-outline" size={16} color="#6366F1" />
+                <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 15 }}>
+                  {currentLanguage === "ar" ? "مشاركة" : currentLanguage === "en" ? "Share" : "Partager"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
         {/* Historique solutions */}
         {cachedSolutions.length > 0 && !result && (
           <View style={{ marginTop: 24 }}>
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
-              🕒 {currentLanguage === "ar" ? "الحلول المحفوظة"
-                : currentLanguage === "en" ? "Saved Solutions"
-                : "Solutions sauvegardées"}
-            </Text>
-            <TouchableOpacity
-              onPress={() => confirmDeleteAll("solutions", "Solutions sauvegardées", currentLanguage, () => setCachedSolutions([]))}
-            >
-              <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
-                {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              justifyContent: "space-between", alignItems: "center", marginBottom: 12,
+            }}>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
+                🕒 {currentLanguage === "ar" ? "الحلول المحفوظة"
+                  : currentLanguage === "en" ? "Saved Solutions"
+                  : "Solutions sauvegardées"}
               </Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => confirmDeleteAll("solutions", "Solutions sauvegardées", currentLanguage, () => setCachedSolutions([]))}
+              >
+                <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                  {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {cachedSolutions.slice(0, displayCount).map((item) => (
               <TouchableOpacity
                 key={item.id}
                 onPress={() => handleLoadFromHistory(item)}
                 style={{
                   backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
-                  marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB",
-                  elevation: 1,
+                  marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB", elevation: 1,
                 }}
               >
                 <Text
-                  style={{
-                    fontSize: 13, color: "#374151", lineHeight: 18,
-                    textAlign: isRTL ? "right" : "left",
-                  } as any}
+                  style={{ fontSize: 13, color: "#374151", lineHeight: 18, textAlign: isRTL ? "right" : "left" } as any}
                   numberOfLines={2}
                 >
                   ✏️ {item.exercise}
@@ -587,23 +594,17 @@ export default function SolveScreen() {
                 }}>
                   <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
                     {new Date(item.createdAt).toLocaleDateString(
-                      currentLanguage === "ar" ? "ar-SA"
-                      : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                      currentLanguage === "ar" ? "ar-SA" : currentLanguage === "en" ? "en-GB" : "fr-FR"
                     )}
                   </Text>
                   {item.subject ? (
-                    <View style={{
-                      backgroundColor: "#EEF2FF", borderRadius: 4,
-                      paddingHorizontal: 6, paddingVertical: 1,
-                    }}>
-                      <Text style={{ fontSize: 10, color: "#6366F1", fontWeight: "600" }}>
-                        {item.subject}
-                      </Text>
+                    <View style={{ backgroundColor: "#EEF2FF", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 }}>
+                      <Text style={{ fontSize: 10, color: "#6366F1", fontWeight: "600" }}>{item.subject}</Text>
                     </View>
                   ) : null}
                   <TouchableOpacity
                     onPress={() => confirmDeleteOne(
-                      "solutions", item.id, item.exercise?.slice(0,30) || "solution", currentLanguage,
+                      "solutions", item.id, item.exercise?.slice(0, 30) || "solution", currentLanguage,
                       () => setCachedSolutions((prev: any[]) => prev.filter((x) => x.id !== item.id)),
                       async () => {
                         const user = auth.currentUser;
@@ -625,8 +626,7 @@ export default function SolveScreen() {
                 disabled={loadingMore}
                 style={{
                   borderRadius: 12, padding: 14, alignItems: "center",
-                  backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
-                  marginTop: 4,
+                  backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB", marginTop: 4,
                 }}
               >
                 {loadingMore ? (
@@ -643,7 +643,6 @@ export default function SolveScreen() {
             )}
           </View>
         )}
-
       </ScrollView>
     </SafeAreaView>
   );
