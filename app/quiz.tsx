@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  ScrollView, ActivityIndicator, Alert,
+  ScrollView, ActivityIndicator, Alert, Share, Clipboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,10 +12,10 @@ import {
   getFirestore, collection, addDoc, Timestamp,
   getDocs, query, where, orderBy, limit, startAfter,
   QueryDocumentSnapshot,
-} from "firebase/firestore"; // ← AJOUT
+} from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // ← AJOUT
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "react-i18next";
 import { useLanguageStore } from "../store/languageStore";
 import { useAIRequest } from "../hooks/useAIRequest";
@@ -27,11 +27,9 @@ import { useDeleteHistory } from "../hooks/useDeleteHistory";
 import { useHistoryStore } from "../store/historyStore";
 import { useFocusEffect } from "expo-router";
 
-
-const CACHE_KEY = "studyai_quizzes"; // ← AJOUT
-const CACHE_TTL = 24 * 60 * 60 * 1000; // ← AJOUT
-const MAX_CACHE_ITEMS = 10; // ← AJOUT
-const PAGE_SIZE = 5; // ← AJOUT
+const CACHE_KEY = "studyai_quizzes";
+const MAX_CACHE_ITEMS = 10;
+const PAGE_SIZE = 5;
 
 interface QuizQuestion {
   question: string;
@@ -40,7 +38,7 @@ interface QuizQuestion {
   explanation: string;
 }
 
-interface CachedQuiz { // ← AJOUT
+interface CachedQuiz {
   id: string;
   userId: string;
   topic: string;
@@ -53,7 +51,7 @@ interface CachedQuiz { // ← AJOUT
 export default function QuizScreen() {
   const app = getApp();
   const auth = getAuth(app);
-  const db = getFirestore(app); // ← AJOUT
+  const db = getFirestore(app);
   const functions = getFunctions(app, "us-central1");
   const { t } = useTranslation();
   const { currentLanguage } = useLanguageStore();
@@ -72,79 +70,69 @@ export default function QuizScreen() {
   const [phase, setPhase] = useState<"setup" | "playing" | "result">("setup");
   const [generating, setGenerating] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
-
-  // ── Historique ────────────────────────────────────────────────── ← AJOUT
   const [cachedQuizzes, setCachedQuizzes] = useState<CachedQuiz[]>([]);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Remplace tout le useEffect par ces deux blocs :
+  useEffect(() => { trackView(); }, []);
 
-useEffect(() => {
-  trackView();
-}, []);
+  useFocusEffect(
+    useCallback(() => {
+      const loadCache = async () => {
+        try {
+          const user = auth.currentUser;
+          if (!user) return;
 
-useFocusEffect(
-  useCallback(() => {
-    const loadCache = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
-        if (raw) {
-          const { data } = JSON.parse(raw);
-          if (data?.length > 0) {
-            setCachedQuizzes(data);
-            setHasMore(data.length >= PAGE_SIZE);
+          const raw = await AsyncStorage.getItem(`${CACHE_KEY}_${user.uid}`);
+          if (raw) {
+            const { data } = JSON.parse(raw);
+            if (data?.length > 0) {
+              setCachedQuizzes(data);
+              setHasMore(data.length >= PAGE_SIZE);
+            }
           }
+
+          const q = query(
+            collection(db, "quizzes"),
+            where("userId", "==", user.uid),
+            orderBy("createdAt", "desc"),
+            limit(PAGE_SIZE)
+          );
+          const snap = await getDocs(q);
+          if (snap.empty) { setCachedQuizzes([]); return; }
+
+          const fromFirestore: CachedQuiz[] = snap.docs.map((doc) => ({
+            id: doc.id,
+            userId: doc.data().userId,
+            topic: doc.data().topic || "",
+            score: doc.data().score || 0,
+            total: doc.data().total || 0,
+            questions: doc.data().questions || [],
+            createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+          }));
+
+          setCachedQuizzes(fromFirestore);
+          setLastDoc(snap.docs[snap.docs.length - 1]);
+          setHasMore(snap.docs.length === PAGE_SIZE);
+
+          await AsyncStorage.setItem(
+            `${CACHE_KEY}_${user.uid}`,
+            JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
+          );
+        } catch (e) {
+          console.log("Quiz cache load error:", e);
         }
+      };
+      loadCache();
+    }, [refreshTrigger])
+  );
 
-        const q = query(
-          collection(db, "quizzes"),
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc"),
-          limit(PAGE_SIZE)
-        );
-        const snap = await getDocs(q);
-        if (snap.empty) {
-          setCachedQuizzes([]);
-          return;
-        }
-
-        const fromFirestore: CachedQuiz[] = snap.docs.map((doc) => ({
-          id: doc.id,
-          userId: doc.data().userId,
-          topic: doc.data().topic || "",
-          score: doc.data().score || 0,
-          total: doc.data().total || 0,
-          questions: doc.data().questions || [],
-          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-        }));
-
-        setCachedQuizzes(fromFirestore);
-        setLastDoc(snap.docs[snap.docs.length - 1]);
-        setHasMore(snap.docs.length === PAGE_SIZE);
-
-        await AsyncStorage.setItem(
-          `${CACHE_KEY}_${user.uid}`,
-          JSON.stringify({ data: fromFirestore, timestamp: Date.now() })
-        );
-      } catch (e) {
-        console.log("Quiz cache load error:", e);
-      }
-    };
-    loadCache();
-  }, [refreshTrigger])
-);
-  // ── Charger plus ── ← AJOUT
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;
     const user = auth.currentUser;
     if (!user) return;
-
     setLoadingMore(true);
     try {
       const q = query(
@@ -184,11 +172,9 @@ useFocusEffect(
     }
   };
 
-  // ── Sauvegarder résultat automatiquement ── ← AJOUT
   const handleSaveResult = async (finalScore: number) => {
     const user = auth.currentUser;
     if (!user || questions.length === 0) return;
-
     try {
       const newEntry: CachedQuiz = {
         id: Date.now().toString(),
@@ -199,16 +185,13 @@ useFocusEffect(
         questions,
         createdAt: new Date().toISOString(),
       };
-
       await addDoc(collection(db, "quizzes"), {
         ...newEntry,
         createdAt: Timestamp.now(),
       });
-
       const updated = [newEntry, ...cachedQuizzes].slice(0, MAX_CACHE_ITEMS);
       setCachedQuizzes(updated);
       setHasMore(updated.length >= PAGE_SIZE);
-
       await AsyncStorage.setItem(
         `${CACHE_KEY}_${user.uid}`,
         JSON.stringify({ data: updated, timestamp: Date.now() })
@@ -218,7 +201,6 @@ useFocusEffect(
     }
   };
 
-  // ── Rejouer un quiz depuis l'historique ── ← AJOUT
   const handleReplay = (item: CachedQuiz) => {
     setTopic(item.topic);
     setQuestions(item.questions);
@@ -236,46 +218,37 @@ useFocusEffect(
   };
 
   const resultMessage = () => {
-    if (score >= questions.length * 0.8) {
-      return currentLanguage === "ar"
-        ? "ممتاز! أنت تتقن الموضوع."
-        : currentLanguage === "en"
-        ? "Excellent! You master the subject."
+    if (score >= questions.length * 0.8)
+      return currentLanguage === "ar" ? "ممتاز! أنت تتقن الموضوع."
+        : currentLanguage === "en" ? "Excellent! You master the subject."
         : "Excellent ! Tu maîtrises le sujet.";
-    } else if (score >= questions.length * 0.5) {
-      return currentLanguage === "ar"
-        ? "جيد! واصل المراجعة."
-        : currentLanguage === "en"
-        ? "Good! Keep revising."
+    if (score >= questions.length * 0.5)
+      return currentLanguage === "ar" ? "جيد! واصل المراجعة."
+        : currentLanguage === "en" ? "Good! Keep revising."
         : "Bien ! Continue à réviser.";
-    }
-    return currentLanguage === "ar"
-      ? "واصل جهودك، ستتقدم!"
-      : currentLanguage === "en"
-      ? "Keep up the effort, you'll improve!"
+    return currentLanguage === "ar" ? "واصل جهودك، ستتقدم!"
+      : currentLanguage === "en" ? "Keep up the effort, you'll improve!"
       : "Continue tes efforts, tu progresseras !";
   };
+
+  const getShareContent = () =>
+    `🧠 ${currentLanguage === "ar" ? "نتيجة الاختبار" : currentLanguage === "en" ? "Quiz Result" : "Résultat Quiz"} — StudyAI\n\n📚 ${topic}\n\n${currentLanguage === "ar" ? "النتيجة" : currentLanguage === "en" ? "Score" : "Score"}: ${score}/${questions.length}\n\n${resultMessage()}`;
 
   const handleGenerate = async () => {
     if (topic.trim().length < 2) {
       Alert.alert(t("error"), "Saisis un sujet pour le quiz.");
       return;
     }
-
     const allowed = await checkAndConsume();
     if (!allowed) return;
 
     const { text: limitedTopic } = limitInput(topic, "quiz");
-
     const cacheInput = { topic: limitedTopic, count, language: currentLanguage };
     const cached = await readAICache("quiz", cacheInput);
     if (cached?.questions?.length > 0) {
       endTracking(true, true);
       setQuestions(cached.questions);
-      setCurrentIndex(0);
-      setScore(0);
-      setSelectedAnswer(null);
-      setShowAnswer(false);
+      setCurrentIndex(0); setScore(0); setSelectedAnswer(null); setShowAnswer(false);
       setPhase("playing");
       return;
     }
@@ -289,10 +262,7 @@ useFocusEffect(
       const qs: QuizQuestion[] = data.questions || [];
       if (qs.length === 0) throw new Error("Aucune question générée.");
       setQuestions(qs);
-      setCurrentIndex(0);
-      setScore(0);
-      setSelectedAnswer(null);
-      setShowAnswer(false);
+      setCurrentIndex(0); setScore(0); setSelectedAnswer(null); setShowAnswer(false);
       setPhase("playing");
       await writeAICache("quiz", cacheInput, data);
       endTracking(true);
@@ -308,9 +278,7 @@ useFocusEffect(
     if (selectedAnswer !== null) return;
     setSelectedAnswer(index);
     setShowAnswer(true);
-    if (index === questions[currentIndex].correct) {
-      setScore((s) => s + 1);
-    }
+    if (index === questions[currentIndex].correct) setScore((s) => s + 1);
   };
 
   const handleNext = () => {
@@ -319,20 +287,14 @@ useFocusEffect(
       setSelectedAnswer(null);
       setShowAnswer(false);
     } else {
-      const finalScore = score + (selectedAnswer === questions[currentIndex].correct ? 0 : 0);
       setPhase("result");
-      handleSaveResult(score); // ← AJOUT — sauvegarde automatique
+      handleSaveResult(score);
     }
   };
 
   const handleReset = () => {
-    setPhase("setup");
-    setTopic("");
-    setQuestions([]);
-    setCurrentIndex(0);
-    setScore(0);
-    setSelectedAnswer(null);
-    setShowAnswer(false);
+    setPhase("setup"); setTopic(""); setQuestions([]);
+    setCurrentIndex(0); setScore(0); setSelectedAnswer(null); setShowAnswer(false);
   };
 
   const q = questions[currentIndex];
@@ -344,29 +306,18 @@ useFocusEffect(
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
-        <View style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
-          alignItems: "center", marginBottom: 24,
-        }}>
+        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 24 }}>
           <TouchableOpacity
             onPress={() => router.back()}
             style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
           >
-            <Ionicons
-              name={isRTL ? "arrow-forward" : "arrow-back"}
-              size={24} color="#374151"
-            />
+            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
           </TouchableOpacity>
           <View>
-            <Text style={{
-              fontSize: 22, fontWeight: "700", color: "#111827",
-              textAlign: isRTL ? "right" : "left",
-            }}>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
               {t("quiz_screen_title")}
             </Text>
-            <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-              {t("generated_by")}
-            </Text>
+            <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{t("generated_by")}</Text>
           </View>
         </View>
 
@@ -375,10 +326,7 @@ useFocusEffect(
         {/* Setup */}
         {phase === "setup" && (
           <View>
-            <Text style={{
-              fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 8,
-              textAlign: isRTL ? "right" : "left",
-            }}>
+            <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
               🧠 {t("quiz_subject")}
             </Text>
             <TextInput
@@ -393,16 +341,10 @@ useFocusEffect(
                 marginBottom: 20, writingDirection: isRTL ? "rtl" : "ltr",
               }}
             />
-            <Text style={{
-              fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10,
-              textAlign: isRTL ? "right" : "left",
-            }}>
+            <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151", marginBottom: 10, textAlign: isRTL ? "right" : "left" }}>
               ❓ {t("quiz_questions")}
             </Text>
-            <View style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
-              gap: 10, marginBottom: 28,
-            }}>
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10, marginBottom: 28 }}>
               {["3", "5", "10"].map((n) => (
                 <TouchableOpacity
                   key={n}
@@ -413,10 +355,7 @@ useFocusEffect(
                     borderWidth: 1, borderColor: count === n ? "#6366F1" : "#E5E7EB",
                   }}
                 >
-                  <Text style={{
-                    fontWeight: "600", fontSize: 15,
-                    color: count === n ? "#FFF" : "#374151",
-                  }}>
+                  <Text style={{ fontWeight: "600", fontSize: 15, color: count === n ? "#FFF" : "#374151" }}>
                     {n}
                   </Text>
                 </TouchableOpacity>
@@ -433,86 +372,60 @@ useFocusEffect(
               {generating ? (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <ActivityIndicator color="#FFF" size="small" />
-                  <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 10 }}>
-                    {t("generating")}
-                  </Text>
+                  <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 10 }}>{t("generating")}</Text>
                 </View>
               ) : (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons name="sparkles" size={20} color="#FFF" />
-                  <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 8 }}>
-                    {t("generate_quiz")}
-                  </Text>
+                  <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16, marginLeft: 8 }}>{t("generate_quiz")}</Text>
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* ── Historique quizzes ── ← AJOUT */}
+            {/* Historique quizzes */}
             {cachedQuizzes.length > 0 && (
               <View style={{ marginTop: 28 }}>
                 <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <Text style={{
-                    fontSize: 15, fontWeight: "700", color: "#111827",
-                    textAlign: isRTL ? "right" : "left",
-                  }}>
-                    🕒 {currentLanguage === "ar" ? "الاختبارات السابقة"
-                      : currentLanguage === "en" ? "Previous Quizzes"
-                      : "Quiz précédents"}
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
+                    🕒 {currentLanguage === "ar" ? "الاختبارات السابقة" : currentLanguage === "en" ? "Previous Quizzes" : "Quiz précédents"}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => confirmDeleteAll("quizzes", currentLanguage === "ar" ? "Quiz" : "Quiz", currentLanguage, () => setCachedQuizzes([]))}
-                  >
+                  <TouchableOpacity onPress={() => confirmDeleteAll("quizzes", "Quiz", currentLanguage, () => setCachedQuizzes([]))}>
                     <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
                       {currentLanguage === "ar" ? "حذف الكل" : currentLanguage === "en" ? "Clear all" : "Tout effacer"}
                     </Text>
                   </TouchableOpacity>
                 </View>
+
                 {cachedQuizzes.slice(0, displayCount).map((item) => (
                   <TouchableOpacity
                     key={item.id}
                     onPress={() => handleReplay(item)}
                     style={{
                       backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14,
-                      marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB",
-                      elevation: 1,
+                      marginBottom: 10, borderWidth: 1, borderColor: "#E5E7EB", elevation: 1,
                     }}
                   >
-                    <View style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
-                      justifyContent: "space-between", alignItems: "center",
-                    }}>
-                      <Text style={{
-                        fontSize: 13, fontWeight: "600", color: "#374151", flex: 1,
-                        textAlign: isRTL ? "right" : "left",
-                      }}
-                        numberOfLines={1}
-                      >
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151", flex: 1, textAlign: isRTL ? "right" : "left" }} numberOfLines={1}>
                         🧠 {item.topic}
                       </Text>
-                      {/* Score badge */}
                       <View style={{
-                        backgroundColor: item.score >= item.total * 0.8 ? "#F0FDF4"
-                          : item.score >= item.total * 0.5 ? "#FFFBEB" : "#FEF2F2",
+                        backgroundColor: item.score >= item.total * 0.8 ? "#F0FDF4" : item.score >= item.total * 0.5 ? "#FFFBEB" : "#FEF2F2",
                         borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
                         marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0,
                       }}>
                         <Text style={{
                           fontSize: 12, fontWeight: "700",
-                          color: item.score >= item.total * 0.8 ? "#065F46"
-                            : item.score >= item.total * 0.5 ? "#92400E" : "#991B1B",
+                          color: item.score >= item.total * 0.8 ? "#065F46" : item.score >= item.total * 0.5 ? "#92400E" : "#991B1B",
                         }}>
                           {item.score}/{item.total}
                         </Text>
                       </View>
                     </View>
-                    <View style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
-                      justifyContent: "space-between", alignItems: "center", marginTop: 6,
-                    }}>
+                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
                       <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
                         {new Date(item.createdAt).toLocaleDateString(
-                          currentLanguage === "ar" ? "ar-SA"
-                          : currentLanguage === "en" ? "en-GB" : "fr-FR"
+                          currentLanguage === "ar" ? "ar-SA" : currentLanguage === "en" ? "en-GB" : "fr-FR"
                         )}
                       </Text>
                       <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 12 }}>
@@ -533,9 +446,7 @@ useFocusEffect(
                         <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4 }}>
                           <Ionicons name="refresh-outline" size={12} color="#6366F1" />
                           <Text style={{ fontSize: 11, color: "#6366F1", fontWeight: "600" }}>
-                            {currentLanguage === "ar" ? "إعادة"
-                              : currentLanguage === "en" ? "Replay"
-                              : "Rejouer"}
+                            {currentLanguage === "ar" ? "إعادة" : currentLanguage === "en" ? "Replay" : "Rejouer"}
                           </Text>
                         </View>
                       </View>
@@ -549,8 +460,7 @@ useFocusEffect(
                     disabled={loadingMore}
                     style={{
                       borderRadius: 12, padding: 14, alignItems: "center",
-                      backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
-                      marginTop: 4,
+                      backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB", marginTop: 4,
                     }}
                   >
                     {loadingMore ? (
@@ -558,30 +468,22 @@ useFocusEffect(
                     ) : (
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <Ionicons name="chevron-down" size={16} color="#6366F1" />
-                        <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 14 }}>
-                          {getMoreLabel()}
-                        </Text>
+                        <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 14 }}>{getMoreLabel()}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
                 )}
               </View>
             )}
-            {/* ── fin Historique ── */}
           </View>
         )}
 
         {/* Playing */}
         {phase === "playing" && q && (
           <View>
-            <View style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
-              justifyContent: "space-between", marginBottom: 8,
-            }}>
+            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginBottom: 8 }}>
               <Text style={{ fontSize: 13, color: "#6B7280" }}>
-                {currentLanguage === "ar"
-                  ? `سؤال ${currentIndex + 1}/${questions.length}`
-                  : `Question ${currentIndex + 1}/${questions.length}`}
+                {currentLanguage === "ar" ? `سؤال ${currentIndex + 1}/${questions.length}` : `Question ${currentIndex + 1}/${questions.length}`}
               </Text>
               <Text style={{ fontSize: 13, fontWeight: "600", color: "#6366F1" }}>
                 {t("score")} : {score}
@@ -595,13 +497,10 @@ useFocusEffect(
               }} />
             </View>
 
-            <View style={{
-              backgroundColor: "#EEF2FF", borderRadius: 14, padding: 20, marginBottom: 20,
-            }}>
+            <View style={{ backgroundColor: "#EEF2FF", borderRadius: 14, padding: 20, marginBottom: 20 }}>
               <Text style={{
                 fontSize: 16, fontWeight: "700", color: "#3730A3", lineHeight: 24,
-                textAlign: isRTL ? "right" : "left",
-                writingDirection: isRTL ? "rtl" : "ltr",
+                textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr",
               }}>
                 {q.question}
               </Text>
@@ -636,17 +535,12 @@ useFocusEffect(
                   </View>
                   <Text style={{
                     fontSize: 14, color: textColor, flex: 1,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
+                    textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr",
                   }}>
                     {option}
                   </Text>
-                  {showAnswer && i === q.correct && (
-                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                  )}
-                  {showAnswer && i === selectedAnswer && i !== q.correct && (
-                    <Ionicons name="close-circle" size={20} color="#EF4444" />
-                  )}
+                  {showAnswer && i === q.correct && <Ionicons name="checkmark-circle" size={20} color="#10B981" />}
+                  {showAnswer && i === selectedAnswer && i !== q.correct && <Ionicons name="close-circle" size={20} color="#EF4444" />}
                 </TouchableOpacity>
               );
             })}
@@ -655,15 +549,12 @@ useFocusEffect(
               <View style={{
                 backgroundColor: "#FFFBEB", borderRadius: 12, padding: 14,
                 marginTop: 4, marginBottom: 16,
-                borderLeftWidth: isRTL ? 0 : 4,
-                borderRightWidth: isRTL ? 4 : 0,
-                borderLeftColor: "#F59E0B",
-                borderRightColor: "#F59E0B",
+                borderLeftWidth: isRTL ? 0 : 4, borderRightWidth: isRTL ? 4 : 0,
+                borderLeftColor: "#F59E0B", borderRightColor: "#F59E0B",
               }}>
                 <Text style={{
                   fontSize: 13, color: "#92400E", lineHeight: 20,
-                  textAlign: isRTL ? "right" : "left",
-                  writingDirection: isRTL ? "rtl" : "ltr",
+                  textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr",
                 }}>
                   💡 {q.explanation}
                 </Text>
@@ -673,15 +564,10 @@ useFocusEffect(
             {showAnswer && (
               <TouchableOpacity
                 onPress={handleNext}
-                style={{
-                  backgroundColor: "#6366F1", borderRadius: 14,
-                  padding: 16, alignItems: "center",
-                }}
+                style={{ backgroundColor: "#6366F1", borderRadius: 14, padding: 16, alignItems: "center" }}
               >
                 <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
-                  {currentIndex < questions.length - 1
-                    ? t("next_question")
-                    : t("see_results")}
+                  {currentIndex < questions.length - 1 ? t("next_question") : t("see_results")}
                 </Text>
               </TouchableOpacity>
             )}
@@ -696,20 +582,17 @@ useFocusEffect(
               alignItems: "center", justifyContent: "center", marginBottom: 20,
             }}>
               <Text style={{ fontSize: 36 }}>
-                {score >= questions.length * 0.8 ? "🏆"
-                  : score >= questions.length * 0.5 ? "👍" : "💪"}
+                {score >= questions.length * 0.8 ? "🏆" : score >= questions.length * 0.5 ? "👍" : "💪"}
               </Text>
             </View>
             <Text style={{ fontSize: 24, fontWeight: "700", color: "#111827", marginBottom: 8 }}>
               {score}/{questions.length}
             </Text>
-            <Text style={{
-              fontSize: 15, color: "#6B7280", marginBottom: 12, textAlign: "center",
-            }}>
+            <Text style={{ fontSize: 15, color: "#6B7280", marginBottom: 12, textAlign: "center" }}>
               {resultMessage()}
             </Text>
 
-            {/* Badge sauvegardé automatiquement ← AJOUT */}
+            {/* Badge sauvegardé */}
             <View style={{
               backgroundColor: "#F0FDF4", borderRadius: 8, padding: 8,
               flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 24,
@@ -722,15 +605,12 @@ useFocusEffect(
               </Text>
             </View>
 
-            {/* Boutons result ← AJOUT bouton Rejouer */}
+            {/* Boutons */}
             <View style={{ width: "100%", gap: 12 }}>
               <TouchableOpacity
                 onPress={() => {
-                  // Rejouer le même quiz
-                  setCurrentIndex(0);
-                  setScore(0);
-                  setSelectedAnswer(null);
-                  setShowAnswer(false);
+                  setCurrentIndex(0); setScore(0);
+                  setSelectedAnswer(null); setShowAnswer(false);
                   setPhase("playing");
                 }}
                 style={{
@@ -741,23 +621,50 @@ useFocusEffect(
               >
                 <Ionicons name="refresh-outline" size={18} color="#6366F1" />
                 <Text style={{ color: "#6366F1", fontWeight: "700", fontSize: 16 }}>
-                  {currentLanguage === "ar" ? "إعادة المحاولة"
-                    : currentLanguage === "en" ? "Try again"
-                    : "Réessayer"}
+                  {currentLanguage === "ar" ? "إعادة المحاولة" : currentLanguage === "en" ? "Try again" : "Réessayer"}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleReset}
-                style={{
-                  backgroundColor: "#6366F1", borderRadius: 14, padding: 16,
-                  alignItems: "center", width: "100%",
-                }}
+                style={{ backgroundColor: "#6366F1", borderRadius: 14, padding: 16, alignItems: "center", width: "100%" }}
               >
-                <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
-                  🔄 {t("new_quiz")}
-                </Text>
+                <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>🔄 {t("new_quiz")}</Text>
               </TouchableOpacity>
+
+              {/* Copier / Partager */}
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    Clipboard.setString(getShareContent());
+                    Alert.alert("✅", currentLanguage === "ar" ? "تم النسخ!" : currentLanguage === "en" ? "Copied!" : "Copié !");
+                  }}
+                  style={{
+                    flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+                    flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "center", gap: 6,
+                    backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+                  }}
+                >
+                  <Ionicons name="copy-outline" size={16} color="#374151" />
+                  <Text style={{ fontWeight: "600", color: "#374151", fontSize: 15 }}>
+                    {currentLanguage === "ar" ? "نسخ" : currentLanguage === "en" ? "Copy" : "Copier"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={async () => { await Share.share({ message: getShareContent() }); }}
+                  style={{
+                    flex: 1, borderRadius: 12, padding: 14, alignItems: "center",
+                    flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "center", gap: 6,
+                    backgroundColor: "#EEF2FF", borderWidth: 1, borderColor: "#C7D2FE",
+                  }}
+                >
+                  <Ionicons name="share-social-outline" size={16} color="#6366F1" />
+                  <Text style={{ fontWeight: "600", color: "#6366F1", fontSize: 15 }}>
+                    {currentLanguage === "ar" ? "مشاركة" : currentLanguage === "en" ? "Share" : "Partager"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
