@@ -251,9 +251,38 @@ export default function FlashcardsScreen() {
 
         {/* Header */}
         <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 24 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}>
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
-          </TouchableOpacity>
+          <TouchableOpacity
+  onPress={() => {
+    if (result) {
+      Alert.alert(
+        currentLanguage === "ar" ? "إلغاء البطاقات" : currentLanguage === "en" ? "Cancel Flashcards" : "Annuler les flashcards",
+        currentLanguage === "ar" ? "هل تريد الخروج؟ ستفقد البطاقات غير المحفوظة." : currentLanguage === "en" ? "Do you want to exit? Unsaved flashcards will be lost." : "Veux-tu quitter ? Les flashcards non sauvegardées seront perdues.",
+        [
+          {
+            text: currentLanguage === "ar" ? "متابعة" : currentLanguage === "en" ? "Continue" : "Continuer",
+            style: "cancel",
+          },
+          {
+            text: currentLanguage === "ar" ? "خروج" : currentLanguage === "en" ? "Exit" : "Quitter",
+            style: "destructive",
+            onPress: () => {
+              setResult(null);
+              setSaved(false);
+              setTopic("");
+              setFlipped({});
+              setCurrentCard(0);
+            },
+          },
+        ]
+      );
+    } else {
+      router.back();
+    }
+  }}
+  style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+>
+  <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+</TouchableOpacity>
           <View>
             <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
               {t("flashcards_title_screen")}
