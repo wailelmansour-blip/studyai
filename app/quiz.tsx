@@ -308,11 +308,38 @@ export default function QuizScreen() {
         {/* Header */}
         <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 24 }}>
           <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
-          >
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
-          </TouchableOpacity>
+  onPress={() => {
+    if (phase === "playing") {
+      Alert.alert(
+        currentLanguage === "ar" ? "إلغاء الاختبار" : currentLanguage === "en" ? "Cancel Quiz" : "Annuler le quiz",
+        currentLanguage === "ar" ? "هل تريد إلغاء الاختبار الجاري؟ ستفقد تقدمك." : currentLanguage === "en" ? "Do you want to cancel the current quiz? Your progress will be lost." : "Veux-tu annuler le quiz en cours ? Ta progression sera perdue.",
+        [
+          {
+            text: currentLanguage === "ar" ? "متابعة" : currentLanguage === "en" ? "Continue" : "Continuer",
+            style: "cancel",
+          },
+          {
+            text: currentLanguage === "ar" ? "إلغاء الاختبار" : currentLanguage === "en" ? "Cancel Quiz" : "Annuler",
+            style: "destructive",
+            onPress: () => {
+              setPhase("setup");
+              setQuestions([]);
+              setCurrentIndex(0);
+              setScore(0);
+              setSelectedAnswer(null);
+              setShowAnswer(false);
+            },
+          },
+        ]
+      );
+    } else {
+      router.back();
+    }
+  }}
+  style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+>
+  <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+</TouchableOpacity>
           <View>
             <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
               {t("quiz_screen_title")}
