@@ -21,9 +21,8 @@ export default function RankingRulesScreen() {
     { icon: "📅", action: getLabel("Plan d'étude généré", "Study plan generated", "خطة دراسية منشأة"), pts: "+5" },
     { icon: "💡", action: getLabel("Explication demandée", "Explanation requested", "شرح مطلوب"), pts: "+3" },
     { icon: "✏️", action: getLabel("Solution demandée", "Solution requested", "حل مطلوب"), pts: "+3" },
-    { icon: "🔥", action: getLabel("Streak jour consécutif", "Daily streak", "يوم متتالي"), pts: "+2" },
     { icon: "💬", action: getLabel("Message chat IA", "AI chat message", "رسالة في المحادثة"), pts: "+2" },
-
+    { icon: "🔥", action: getLabel("Streak jour consécutif", "Daily streak", "يوم متتالي"), pts: "+2" },
   ];
 
   return (
@@ -143,28 +142,28 @@ export default function RankingRulesScreen() {
           </Text>
         </View>
 
-        {/* Trophées — surprise */}
+        {/* Trophées */}
         <View style={{
-          backgroundColor: "#FFFBEB", borderRadius: 14,
+          backgroundColor: "#F3F4F6", borderRadius: 14,
           padding: 16, marginBottom: 24,
-          borderWidth: 1, borderColor: "#FCD34D",
+          borderWidth: 1, borderColor: "#E5E7EB",
           alignItems: "center",
         }}>
-          <Text style={{ fontSize: 32, marginBottom: 8 }}>🎁</Text>
+          <Text style={{ fontSize: 32, marginBottom: 8 }}>🏅</Text>
           <Text style={{
-            fontSize: 14, fontWeight: "700", color: "#92400E",
+            fontSize: 14, fontWeight: "700", color: "#374151",
             marginBottom: 6, textAlign: "center",
           }}>
-            {getLabel("Des trophées t'attendent !", "Trophies are waiting for you!", "جوائز تنتظرك!")}
+            {getLabel("Trophées à débloquer", "Trophies to unlock", "جوائز للفتح")}
           </Text>
           <Text style={{
-            fontSize: 13, color: "#92400E", lineHeight: 20,
+            fontSize: 13, color: "#6B7280", lineHeight: 20,
             textAlign: "center",
           }}>
             {getLabel(
-              "Utilise StudyAI régulièrement pour débloquer des trophées surprises. À toi de les découvrir ! 🏅",
-              "Use StudyAI regularly to unlock surprise trophies. Discover them yourself! 🏅",
-              "استخدم StudyAI بانتظام لفتح جوائز مفاجئة. اكتشفها بنفسك! 🏅"
+              "Utilise StudyAI régulièrement pour débloquer des trophées basés sur tes accomplissements.",
+              "Use StudyAI regularly to unlock trophies based on your achievements.",
+              "استخدم StudyAI بانتظام لفتح جوائز بناءً على إنجازاتك."
             )}
           </Text>
         </View>

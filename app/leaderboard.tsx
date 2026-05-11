@@ -173,16 +173,22 @@ export default function LeaderboardScreen() {
         {/* Trophées vides */}
         {stats && stats.trophies.length === 0 && (
           <View style={{
-            backgroundColor: "#FFFBEB", borderRadius: 14, padding: 16,
+            backgroundColor: "#F3F4F6", borderRadius: 14, padding: 16,
             marginBottom: 24, alignItems: "center",
-            borderWidth: 1, borderColor: "#FCD34D",
+            borderWidth: 1, borderColor: "#E5E7EB",
           }}>
-            <Text style={{ fontSize: 28, marginBottom: 8 }}>🎁</Text>
-            <Text style={{ fontSize: 13, color: "#92400E", textAlign: "center" }}>
+            <Text style={{ fontSize: 28, marginBottom: 8 }}>🏅</Text>
+            <Text style={{
+              fontSize: 14, fontWeight: "600", color: "#374151",
+              marginBottom: 4, textAlign: "center",
+            }}>
+              {getLabel("Aucun trophée encore", "No trophies yet", "لا توجد جوائز بعد")}
+            </Text>
+            <Text style={{ fontSize: 13, color: "#6B7280", textAlign: "center", lineHeight: 20 }}>
               {getLabel(
-                "Continue à utiliser StudyAI pour débloquer tes premiers trophées !",
-                "Keep using StudyAI to unlock your first trophies!",
-                "استمر في استخدام StudyAI لفتح أول جوائزك!"
+                "Utilise StudyAI régulièrement pour débloquer des trophées.",
+                "Use StudyAI regularly to unlock trophies.",
+                "استخدم StudyAI بانتظام لفتح الجوائز."
               )}
             </Text>
           </View>
@@ -302,9 +308,7 @@ export default function LeaderboardScreen() {
             }}>
               📈 {getLabel("Mes statistiques", "My Statistics", "إحصائياتي")}
             </Text>
-            <View style={{
-              flexDirection: "row", flexWrap: "wrap", gap: 10,
-            }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
               {[
                 { label: getLabel("Quiz", "Quizzes", "اختبارات"), value: stats.totalQuizzes, icon: "🧠" },
                 { label: getLabel("Parfaits", "Perfect", "مثالية"), value: stats.totalQuizPerfect, icon: "🎯" },
