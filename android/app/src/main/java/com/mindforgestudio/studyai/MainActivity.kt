@@ -1,4 +1,4 @@
-package com.studyai.app
+package com.mindforgestudio.studyai
 
 import android.os.Build
 import android.os.Bundle

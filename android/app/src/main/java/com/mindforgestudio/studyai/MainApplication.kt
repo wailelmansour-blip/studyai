@@ -1,4 +1,4 @@
-package com.studyai.app
+package com.mindforgestudio.studyai
 
 import android.app.Application
 import android.content.res.Configuration

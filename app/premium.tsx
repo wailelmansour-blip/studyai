@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useLanguageStore } from "../store/languageStore";
 import { LIMITS, FILE_LIMITS } from "../types/usage";
+import { Linking } from "react-native";
 
 export default function PremiumScreen() {
   const { currentLanguage } = useLanguageStore();
@@ -34,21 +35,21 @@ export default function PremiumScreen() {
       premium: `${FILE_LIMITS.premium} / ${getLabel("jour", "day", "يوم")}`,
     },
     {
-      icon: "school-outline",
-      color: "#10B981",
-      bg: "#F0FDF4",
-      title: getLabel("Quiz illimités", "Unlimited Quizzes", "اختبارات غير محدودة"),
-      free: getLabel("Limité", "Limited", "محدود"),
-      premium: getLabel("Illimité", "Unlimited", "غير محدود"),
-    },
-    {
-      icon: "layers-outline",
-      color: "#EC4899",
-      bg: "#FDF2F8",
-      title: getLabel("Flashcards illimitées", "Unlimited Flashcards", "بطاقات غير محدودة"),
-      free: getLabel("Limité", "Limited", "محدود"),
-      premium: getLabel("Illimité", "Unlimited", "غير محدود"),
-    },
+  icon: "school-outline",
+  color: "#10B981",
+  bg: "#F0FDF4",
+  title: getLabel("Quiz IA", "AI Quiz", "اختبارات ذكية"),
+  free: `${LIMITS.free} / ${getLabel("jour", "day", "يوم")}`,
+  premium: `${LIMITS.premium} / ${getLabel("jour", "day", "يوم")}`,
+},
+{
+  icon: "layers-outline",
+  color: "#EC4899",
+  bg: "#FDF2F8",
+  title: getLabel("Flashcards", "Flashcards", "بطاقات تعليمية"),
+  free: `${LIMITS.free} / ${getLabel("jour", "day", "يوم")}`,
+  premium: `${LIMITS.premium} / ${getLabel("jour", "day", "يوم")}`,
+},
     {
       icon: "chatbubbles-outline",
       color: "#8B5CF6",
@@ -68,25 +69,25 @@ export default function PremiumScreen() {
   ];
 
   const handleSubscribe = () => {
-    Alert.alert(
-      getLabel("Bientôt disponible", "Coming Soon", "قريباً"),
-      getLabel(
-        "Le paiement en ligne sera disponible très prochainement.\n\nPour souscrire maintenant, contactez-nous :\nmindforge.studio.dev@gmail.com",
-        "Online payment will be available very soon.\n\nTo subscribe now, contact us:\nmindforge.studio.dev@gmail.com",
-        "سيكون الدفع الإلكتروني متاحاً قريباً جداً.\n\nللاشتراك الآن، تواصل معنا:\nmindforge.studio.dev@gmail.com"
-      ),
-      [
-        {
-          text: getLabel("Annuler", "Cancel", "إلغاء"),
-          style: "cancel",
-        },
-        {
-          text: getLabel("Contacter", "Contact", "تواصل"),
-          onPress: () => {},
-        },
-      ]
-    );
-  };
+  Alert.alert(
+    getLabel("Bientôt disponible", "Coming Soon", "قريباً"),
+    getLabel(
+      "Le paiement en ligne sera disponible très prochainement.\n\nPour souscrire maintenant, contactez-nous :\nmindforge.studio.dev@gmail.com",
+      "Online payment will be available very soon.\n\nTo subscribe now, contact us:\nmindforge.studio.dev@gmail.com",
+      "سيكون الدفع الإلكتروني متاحاً قريباً جداً.\n\nللاشتراك الآن، تواصل معنا:\nmindforge.studio.dev@gmail.com"
+    ),
+    [
+      {
+        text: getLabel("Annuler", "Cancel", "إلغاء"),
+        style: "cancel",
+      },
+      {
+        text: getLabel("Contacter", "Contact", "تواصل"),
+        onPress: () => Linking.openURL("mailto:mindforge.studio.dev@gmail.com"),
+      },
+    ]
+  );
+};
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>

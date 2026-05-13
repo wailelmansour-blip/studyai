@@ -27,7 +27,8 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="studyai"/>
-        <data android:scheme="com.studyai.app"/>
+        <data android:scheme="com.mindforgestudio.studyai"/>
+        <data android:scheme="exp+studyai"/>
       </intent-filter>
     </activity>
   </application>
