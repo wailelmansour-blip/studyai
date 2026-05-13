@@ -318,29 +318,22 @@ export default function ProfileScreen() {
 
         {/* Upgrade Premium */}
         {!isPremium && (
-          <TouchableOpacity
-            style={{ borderRadius: 14, padding: 16, marginBottom: 16, alignItems: "center", backgroundColor: "#6366F1" }}
-            onPress={() => Alert.alert(
-              getLabel("Passer au Premium ✨", "Upgrade to Premium ✨", "الترقية إلى Premium ✨"),
-              getLabel(
-                `Débloquez ${LIMITS.premium} requêtes/jour et ${FILE_LIMITS.premium} fichiers/jour.\n\nContactez-nous pour plus d'informations.`,
-                `Unlock ${LIMITS.premium} requests/day and ${FILE_LIMITS.premium} files/day.\n\nContact us for more information.`,
-                `افتح ${LIMITS.premium} طلب/يوم و${FILE_LIMITS.premium} ملف/يوم.\n\nتواصل معنا للمزيد من المعلومات.`
-              )
-            )}
-          >
-            <Text style={{ fontSize: 15, fontWeight: "700", color: "#FFF" }}>
-              ✨ {getLabel("Passer au Premium", "Upgrade to Premium", "الترقية إلى Premium")}
-            </Text>
-            <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 4 }}>
-              {getLabel(
-                `${LIMITS.premium} requêtes · ${FILE_LIMITS.premium} fichiers par jour`,
-                `${LIMITS.premium} requests · ${FILE_LIMITS.premium} files per day`,
-                `${LIMITS.premium} طلب · ${FILE_LIMITS.premium} ملف يومياً`
-              )}
-            </Text>
-          </TouchableOpacity>
-        )}
+  <TouchableOpacity
+    style={{ borderRadius: 14, padding: 16, marginBottom: 16, alignItems: "center", backgroundColor: "#6366F1" }}
+    onPress={() => router.push("/premium" as any)}
+  >
+    <Text style={{ fontSize: 15, fontWeight: "700", color: "#FFF" }}>
+      ✨ {getLabel("Passer au Premium", "Upgrade to Premium", "الترقية إلى Premium")}
+    </Text>
+    <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 4 }}>
+      {getLabel(
+        `${LIMITS.premium} requêtes · ${FILE_LIMITS.premium} fichiers par jour`,
+        `${LIMITS.premium} requests · ${FILE_LIMITS.premium} files per day`,
+        `${LIMITS.premium} طلب · ${FILE_LIMITS.premium} ملف يومياً`
+      )}
+    </Text>
+  </TouchableOpacity>
+)}
 
         {/* Menu items */}
         <View style={{
