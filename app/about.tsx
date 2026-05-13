@@ -7,7 +7,6 @@ import { router } from "expo-router";
 import { useLanguageStore } from "../store/languageStore";
 import Constants from "expo-constants";
 
-// ── Composant badge modèle IA ──────────────────────────────────────────────────
 const AIModelBadge = ({
   getLabel,
 }: {
@@ -15,7 +14,6 @@ const AIModelBadge = ({
   getLabel: (fr: string, en: string, ar: string) => string;
 }) => {
   const aiModel = Constants.expoConfig?.extra?.aiModel || "gpt-4o-mini";
-
   return (
     <Text style={{ fontSize: 13, color: "#6366F1", fontWeight: "600" }}>
       {getLabel("Propulsé par", "Powered by", "مدعوم بـ")} {aiModel}
@@ -23,7 +21,6 @@ const AIModelBadge = ({
   );
 };
 
-// ── Écran principal ────────────────────────────────────────────────────────────
 export default function AboutScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
@@ -99,12 +96,12 @@ export default function AboutScreen() {
     {
       icon: "shield-checkmark-outline",
       label: getLabel("Politique de confidentialité", "Privacy Policy", "سياسة الخصوصية"),
-      onPress: () => router.push("/privacy" as any),
+      onPress: () => Linking.openURL("https://studyai-ab88e.web.app/privacy.html"),
     },
     {
       icon: "document-outline",
       label: getLabel("Conditions d'utilisation", "Terms of Service", "شروط الاستخدام"),
-      onPress: () => router.push("/terms" as any),
+      onPress: () => Linking.openURL("https://studyai-ab88e.web.app/terms.html"),
     },
   ];
 

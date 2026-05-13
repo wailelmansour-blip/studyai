@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyAI — Conditions d'utilisation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #F8F9FA;
+      color: #111827;
+      line-height: 1.7;
+    }
+    header {
+      background: #6366F1;
+      color: white;
+      padding: 40px 24px;
+      text-align: center;
+    }
+    header h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+    header p { font-size: 14px; opacity: 0.85; }
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 4px 16px;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 32px 24px 60px;
+    }
+    .intro {
+      background: #EEF2FF;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      color: #3730A3;
+      font-size: 14px;
+    }
+    .section {
+      background: white;
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: 14px;
+      border: 1px solid #F3F4F6;
+    }
+    .section h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #6366F1;
+      margin-bottom: 10px;
+    }
+    .section p, .section li {
+      font-size: 14px;
+      color: #374151;
+      line-height: 1.7;
+    }
+    .section ul {
+      padding-left: 20px;
+      margin-top: 6px;
+    }
+    .section li { margin-bottom: 4px; }
+    .lang-switcher {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .lang-btn {
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: 2px solid #6366F1;
+      background: white;
+      color: #6366F1;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .lang-btn.active, .lang-btn:hover {
+      background: #6366F1;
+      color: white;
+    }
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 12px;
+      color: #9CA3AF;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="/icon.png" style="width:60px;height:60px;border-radius:14px;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;" />
+<h1>StudyAI</h1>
+  <p>Terms of Service · Conditions d'utilisation · شروط الاستخدام</p>
+  <span class="badge">Dernière mise à jour : Mai 2025</span>
+</header>
+
+<div class="container">
+
+  <div class="lang-switcher">
+    <button class="lang-btn active" onclick="setLang('fr')">🇫🇷 Français</button>
+    <button class="lang-btn" onclick="setLang('en')">🇬🇧 English</button>
+    <button class="lang-btn" onclick="setLang('ar')">🇲🇦 العربية</button>
+  </div>
+
+  <!-- ═══════════════ FRANÇAIS ═══════════════ -->
+  <div id="lang-fr">
+    <div class="intro">
+      Veuillez lire attentivement ces conditions avant d'utiliser StudyAI. En utilisant notre application, vous acceptez d'être lié par ces conditions.
+    </div>
+
+    <div class="section">
+      <h2>1. Acceptation des conditions</h2>
+      <p>En utilisant StudyAI, vous acceptez les présentes conditions d'utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser l'application.</p>
+    </div>
+
+    <div class="section">
+      <h2>2. Description du service</h2>
+      <p>StudyAI est une application d'aide à l'étude propulsée par l'intelligence artificielle. Elle propose :</p>
+      <ul>
+        <li>Génération de quiz, flashcards et résumés</li>
+        <li>Plans d'étude personnalisés</li>
+        <li>Chat avec un assistant IA</li>
+        <li>Explications et résolution de problèmes</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>3. Compte utilisateur</h2>
+      <p>Pour utiliser StudyAI, vous devez :</p>
+      <ul>
+        <li>Créer un compte avec des informations exactes</li>
+        <li>Maintenir la confidentialité de votre mot de passe</li>
+        <li>Être responsable de toute activité sur votre compte</li>
+        <li>Avoir au moins 13 ans ou obtenir le consentement parental</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>4. Utilisation acceptable</h2>
+      <p>Vous vous engagez à ne pas :</p>
+      <ul>
+        <li>Utiliser l'application à des fins illégales</li>
+        <li>Tenter de contourner les limites d'utilisation</li>
+        <li>Partager votre compte avec d'autres personnes</li>
+        <li>Utiliser l'IA pour générer du contenu nuisible ou trompeur</li>
+        <li>Copier ou redistribuer le contenu de l'application</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>5. Limites d'utilisation</h2>
+      <p><strong>Plan gratuit :</strong> 5 requêtes IA et 1 fichier par jour.<br>
+      <strong>Plan Premium :</strong> 50 requêtes IA et 10 fichiers par jour.<br>
+      Ces limites sont remises à zéro chaque jour. StudyAI se réserve le droit de modifier ces limites à tout moment.</p>
+    </div>
+
+    <div class="section">
+      <h2>6. Abonnement Premium</h2>
+      <p>L'abonnement Premium est facturé mensuellement à 4.99€/mois. Il est résiliable à tout moment depuis les paramètres de votre compte Google Play. Le remboursement est soumis à la politique de remboursement de Google Play.</p>
+    </div>
+
+    <div class="section">
+      <h2>7. Propriété intellectuelle</h2>
+      <p>L'application StudyAI, son interface et son code source sont la propriété exclusive de MindForge Studio. Le contenu généré par l'IA appartient à l'utilisateur qui l'a créé, sous réserve des conditions d'utilisation d'OpenAI.</p>
+    </div>
+
+    <div class="section">
+      <h2>8. Résiliation</h2>
+      <p>StudyAI se réserve le droit de suspendre ou supprimer votre compte en cas de violation des présentes conditions. Vous pouvez supprimer votre compte à tout moment depuis l'écran Profil.</p>
+    </div>
+
+    <div class="section">
+      <h2>9. Contact</h2>
+      <p>Pour toute question concernant ces conditions :<br>
+      <a href="mailto:mindforge.studio.dev@gmail.com" style="color:#6366F1">mindforge.studio.dev@gmail.com</a></p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ENGLISH ═══════════════ -->
+  <div id="lang-en" class="hidden">
+    <div class="intro">
+      Please read these terms carefully before using StudyAI. By using our application, you agree to be bound by these terms.
+    </div>
+
+    <div class="section">
+      <h2>1. Acceptance of Terms</h2>
+      <p>By using StudyAI, you agree to these terms of service. If you do not agree to these terms, please do not use the application.</p>
+    </div>
+
+    <div class="section">
+      <h2>2. Service Description</h2>
+      <p>StudyAI is an AI-powered study assistance application. It offers:</p>
+      <ul>
+        <li>Generation of quizzes, flashcards and summaries</li>
+        <li>Personalized study plans</li>
+        <li>Chat with an AI assistant</li>
+        <li>Explanations and problem solving</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>3. User Account</h2>
+      <p>To use StudyAI, you must:</p>
+      <ul>
+        <li>Create an account with accurate information</li>
+        <li>Maintain the confidentiality of your password</li>
+        <li>Be responsible for all activity on your account</li>
+        <li>Be at least 13 years old or obtain parental consent</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>4. Acceptable Use</h2>
+      <p>You agree not to:</p>
+      <ul>
+        <li>Use the application for illegal purposes</li>
+        <li>Attempt to circumvent usage limits</li>
+        <li>Share your account with others</li>
+        <li>Use AI to generate harmful or misleading content</li>
+        <li>Copy or redistribute application content</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>5. Usage Limits</h2>
+      <p><strong>Free plan:</strong> 5 AI requests and 1 file per day.<br>
+      <strong>Premium plan:</strong> 50 AI requests and 10 files per day.<br>
+      These limits reset daily. StudyAI reserves the right to modify these limits at any time.</p>
+    </div>
+
+    <div class="section">
+      <h2>6. Premium Subscription</h2>
+      <p>The Premium subscription is billed monthly at €4.99/month. It can be cancelled at any time from your Google Play account settings. Refunds are subject to Google Play's refund policy.</p>
+    </div>
+
+    <div class="section">
+      <h2>7. Intellectual Property</h2>
+      <p>The StudyAI application, its interface and source code are the exclusive property of MindForge Studio. AI-generated content belongs to the user who created it, subject to OpenAI's terms of use.</p>
+    </div>
+
+    <div class="section">
+      <h2>8. Termination</h2>
+      <p>StudyAI reserves the right to suspend or delete your account in case of violation of these terms. You can delete your account at any time from the Profile screen.</p>
+    </div>
+
+    <div class="section">
+      <h2>9. Contact</h2>
+      <p>For any questions regarding these terms:<br>
+      <a href="mailto:mindforge.studio.dev@gmail.com" style="color:#6366F1">mindforge.studio.dev@gmail.com</a></p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ARABIC ═══════════════ -->
+  <div id="lang-ar" class="hidden" dir="rtl">
+    <div class="intro" style="text-align:right">
+      يرجى قراءة هذه الشروط بعناية قبل استخدام StudyAI. باستخدام تطبيقنا، فإنك توافق على الالتزام بهذه الشروط.
+    </div>
+
+    <div class="section">
+      <h2>1. قبول الشروط</h2>
+      <p>باستخدام StudyAI، فإنك توافق على شروط الاستخدام هذه. إذا كنت لا توافق على هذه الشروط، يرجى عدم استخدام التطبيق.</p>
+    </div>
+
+    <div class="section">
+      <h2>2. وصف الخدمة</h2>
+      <p>StudyAI هو تطبيق مساعدة في الدراسة مدعوم بالذكاء الاصطناعي. يقدم:</p>
+      <ul>
+        <li>توليد الاختبارات والبطاقات التعليمية والملخصات</li>
+        <li>خطط دراسية مخصصة</li>
+        <li>محادثة مع مساعد ذكاء اصطناعي</li>
+        <li>شروحات وحل المسائل</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>3. حساب المستخدم</h2>
+      <p>لاستخدام StudyAI، يجب عليك:</p>
+      <ul>
+        <li>إنشاء حساب بمعلومات دقيقة</li>
+        <li>الحفاظ على سرية كلمة المرور</li>
+        <li>تحمل المسؤولية عن جميع الأنشطة على حسابك</li>
+        <li>أن يكون عمرك 13 عامًا على الأقل أو الحصول على موافقة الوالدين</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>4. الاستخدام المقبول</h2>
+      <p>توافق على عدم:</p>
+      <ul>
+        <li>استخدام التطبيق لأغراض غير قانونية</li>
+        <li>محاولة التحايل على حدود الاستخدام</li>
+        <li>مشاركة حسابك مع الآخرين</li>
+        <li>استخدام الذكاء الاصطناعي لتوليد محتوى ضار أو مضلل</li>
+        <li>نسخ محتوى التطبيق أو إعادة توزيعه</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>5. حدود الاستخدام</h2>
+      <p><strong>الخطة المجانية:</strong> 5 طلبات ذكاء اصطناعي وملف واحد يوميًا.<br>
+      <strong>الخطة المدفوعة:</strong> 50 طلبًا و10 ملفات يوميًا.<br>
+      تُعاد هذه الحدود يوميًا. يحتفظ StudyAI بحق تعديل هذه الحدود في أي وقت.</p>
+    </div>
+
+    <div class="section">
+      <h2>6. الاشتراك المدفوع</h2>
+      <p>يُفوتر الاشتراك المدفوع شهريًا بـ 4.99€/شهر. يمكن إلغاؤه في أي وقت من إعدادات حساب Google Play الخاص بك.</p>
+    </div>
+
+    <div class="section">
+      <h2>7. الملكية الفكرية</h2>
+      <p>تطبيق StudyAI وواجهته وشفرته المصدرية هي ملكية حصرية لـ MindForge Studio. المحتوى الذي ينشئه الذكاء الاصطناعي يعود للمستخدم الذي أنشأه.</p>
+    </div>
+
+    <div class="section">
+      <h2>8. الإنهاء</h2>
+      <p>يحتفظ StudyAI بحق تعليق حسابك أو حذفه في حالة انتهاك هذه الشروط. يمكنك حذف حسابك في أي وقت من شاشة الملف الشخصي.</p>
+    </div>
+
+    <div class="section">
+      <h2>9. التواصل</h2>
+      <p>لأي أسئلة تتعلق بهذه الشروط:<br>
+      <a href="mailto:mindforge.studio.dev@gmail.com" style="color:#6366F1">mindforge.studio.dev@gmail.com</a></p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  © 2025 StudyAI — MindForge Studio · All rights reserved
+</footer>
+
+<script>
+  function setLang(lang) {
+    ['fr', 'en', 'ar'].forEach(l => {
+      document.getElementById('lang-' + l).classList.add('hidden');
+    });
+    document.getElementById('lang-' + lang).classList.remove('hidden');
+    document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
