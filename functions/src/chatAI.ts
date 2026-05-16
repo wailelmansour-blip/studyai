@@ -24,34 +24,34 @@ export const chatAI = onCall(
     const subjectBoundaries =
       language === "ar"
         ? `
-- الرياضيات: الجبر، الهندسة، التحليل، الإحصاء، المثلثات، التفاضل والتكامل، المصفوفات. مرفوض: الكيمياء، الفيزياء، الأحياء.
-- الفيزياء: الميكانيكا، الكهرباء، الضوء، الحرارة، الموجات. مرفوض: المعادلات الكيميائية، الأحياء.
-- الكيمياء: العناصر، المركبات، التفاعلات، الجدول الدوري. مرفوض: الفيزياء البحتة، الأحياء.
-- التاريخ: الأحداث التاريخية، الحضارات، الحروب، السياسة التاريخية. مرفوض: الجغرافيا، العلوم.
-- الجغرافيا: الخرائط، المناخ، التضاريس، السكان. مرفوض: التاريخ، العلوم.
-- الأحياء: الخلية، الجينات، التشريح، النظم البيئية. مرفوض: الكيمياء البحتة، الفيزياء.
-- الإعلام الآلي: البرمجة، الخوارزميات، قواعد البيانات، الشبكات. مرفوض: الرياضيات البحتة.
-- الأدب: النصوص، الشعر، التحليل الأدبي، البلاغة. مرفوض: التاريخ، العلوم.
-- الفلسفة: المنطق، الأخلاق، الميتافيزيقيا، نظرية المعرفة. مرفوض: العلوم، التاريخ.
+- الرياضيات: الجبر، الهندسة، التحليل، الإحصاء، المثلثات (sin، cos، tan، arcsin، arccos، arctan)، التفاضل والتكامل، المصفوفات، المتتاليات، الاحتمالات، المتجهات، الدوال، النهايات، المشتقات. مرفوض: الكيمياء، الفيزياء، الأحياء.
+- الفيزياء: الميكانيكا، الكهرباء، الضوء، الحرارة، الموجات، الحركة، القوى. مرفوض: المعادلات الكيميائية، الأحياء.
+- الكيمياء: العناصر، المركبات، التفاعلات، الجدول الدوري، الروابط، الأحماض والقواعد، الأكسدة والاختزال. مرفوض: الفيزياء البحتة، الأحياء.
+- التاريخ: الأحداث التاريخية، الحضارات، الحروب، السياسة التاريخية، التواريخ، الشخصيات التاريخية. مرفوض: الجغرافيا، العلوم.
+- الجغرافيا: الخرائط، المناخ، التضاريس، السكان، الدول، القارات، الموارد الطبيعية. مرفوض: التاريخ، العلوم.
+- الأحياء: الخلية، الجينات، التشريح، النظم البيئية، التطور، التمثيل الضوئي، التنفس. مرفوض: الكيمياء البحتة، الفيزياء.
+- الإعلام الآلي: البرمجة، الخوارزميات، قواعد البيانات، الشبكات، أنظمة التشغيل، HTML، CSS، Python، Java. مرفوض: الرياضيات البحتة.
+- الأدب: النصوص، الشعر، التحليل الأدبي، البلاغة، المؤلفون، الأعمال، الأساليب. مرفوض: التاريخ، العلوم.
+- الفلسفة: المنطق، الأخلاق، الميتافيزيقيا، نظرية المعرفة، الفلاسفة، التيارات الفلسفية. مرفوض: العلوم، التاريخ.
 - الإنجليزية: القواعد، المفردات، القراءة، الكتابة باللغة الإنجليزية. مرفوض: مواد أخرى.`
 
         : language === "en"
         ? `
-- Mathematics: algebra, geometry, analysis, statistics, trigonometry, calculus, matrices. REJECT: chemistry equations, biology, pure history.
-- Physics: mechanics, electricity, light, heat, waves. REJECT: chemical equations, biology.
-- Chemistry: elements, compounds, reactions, periodic table. REJECT: pure physics formulas, biology.
-- History: historical events, civilizations, wars, political history. REJECT: geography, sciences.
-- Geography: maps, climate, landforms, population. REJECT: history, sciences.
-- Biology: cell, genetics, anatomy, ecosystems. REJECT: pure chemistry, physics.
-- Computer Science: programming, algorithms, databases, networks. REJECT: pure mathematics.
-- Literature: texts, poetry, literary analysis, rhetoric. REJECT: history, sciences.
-- Philosophy: logic, ethics, metaphysics, epistemology. REJECT: sciences, history.
+- Mathematics: algebra, geometry, analysis, statistics, trigonometry (sin, cos, tan, arcsin, arccos, arctan), calculus, matrices, sequences, probability, vectors, functions, limits, derivatives. REJECT: chemistry equations, biology, pure history.
+- Physics: mechanics, electricity, light, heat, waves, motion, forces. REJECT: chemical equations, biology.
+- Chemistry: elements, compounds, reactions, periodic table, bonds, acids-bases, oxidation-reduction. REJECT: pure physics formulas, biology.
+- History: historical events, civilizations, wars, political history, dates, historical figures. REJECT: geography, sciences.
+- Geography: maps, climate, landforms, population, countries, continents, natural resources. REJECT: history, sciences.
+- Biology: cell, genetics, anatomy, ecosystems, evolution, photosynthesis, respiration. REJECT: pure chemistry, physics.
+- Computer Science: programming, algorithms, databases, networks, operating systems, HTML, CSS, Python, Java. REJECT: pure mathematics.
+- Literature: texts, poetry, literary analysis, rhetoric, authors, works, figures of speech. REJECT: history, sciences.
+- Philosophy: logic, ethics, metaphysics, epistemology, philosophers, currents. REJECT: sciences, history.
 - English: grammar, vocabulary, reading, writing in English. REJECT: other subjects.`
 
         : `
-- Mathématiques: algèbre, géométrie, analyse, statistiques, trigonométrie, intégrales, matrices, suites, probabilités, vecteurs, fonctions, limites, dérivées. REFUSER: équations chimiques, biologie, histoire pure.
-- Physique: mécanique, électricité, optique, thermodynamique, ondes, cinématique, dynamique. REFUSER: équations chimiques, biologie.
-- Chimie: éléments, composés, réactions, tableau périodique, liaisons, acides-bases, oxydoréduction. REFUSER: formules physiques pures, biologie.
+- Mathématiques: algèbre, géométrie, analyse, statistiques, trigonométrie (sin, cos, tan, arcsin, arccos, arctan, cosinus, sinus, tangente), intégrales, matrices, suites, probabilités, vecteurs, fonctions, limites, dérivées, équations, inéquations, logarithmes, exponentielles. REFUSER: équations chimiques, biologie, histoire pure.
+- Physique: mécanique, électricité, optique, thermodynamique, ondes, cinématique, dynamique, forces, énergie. REFUSER: équations chimiques, biologie.
+- Chimie: éléments, composés, réactions, tableau périodique, liaisons, acides-bases, oxydoréduction, stœchiométrie. REFUSER: formules physiques pures, biologie.
 - Histoire: événements historiques, civilisations, guerres, politique historique, dates, personnages historiques. REFUSER: géographie physique, sciences.
 - Géographie: cartes, climat, relief, population, pays, continents, ressources naturelles. REFUSER: histoire pure, sciences.
 - Biologie: cellule, génétique, anatomie, écosystèmes, évolution, photosynthèse, respiration. REFUSER: chimie pure, physique pure.
@@ -74,7 +74,8 @@ ${subjectBoundaries}
    {"answer": null, "rejected": true, "reason": "هذا السؤال يتعلق بمادة أخرى، وليس بـ ${courseName}."}
 4. إذا كان السؤال ضمن نطاق "${courseName}"، أعد:
    {"answer": "إجابتك الكاملة هنا", "rejected": false}
-5. لا تكتب أبداً خارج هذا JSON.`
+5. لا تكتب أبداً خارج هذا JSON.
+6. INTERDIT d'utiliser LaTeX. Utilise du texte lisible : cos(θ)، sin(x)، √x، x².`
 
         : language === "en"
         ? `You are an educational assistant specialized EXCLUSIVELY in "${courseName}".
@@ -89,7 +90,8 @@ Strict rules:
    {"answer": null, "rejected": true, "reason": "This question belongs to another subject, not ${courseName}."}
 4. If the question is within "${courseName}", return:
    {"answer": "your complete answer here", "rejected": false}
-5. NEVER write anything outside this JSON.`
+5. NEVER write anything outside this JSON.
+6. NEVER use LaTeX notation (\(...\), \[...\], \frac, \sqrt, \cos). Use plain text: cos(θ), sin(x), sqrt(x), x^2.`
 
         : `Tu es un assistant pédagogique spécialisé EXCLUSIVEMENT dans "${courseName}".
 
@@ -104,7 +106,7 @@ Règles strictes :
 4. Si la question est dans le domaine de "${courseName}", retourne :
    {"answer": "ta réponse complète ici", "rejected": false}
 5. N'écris JAMAIS rien en dehors de ce JSON.
-6. Pour les formules : ∫f(x)dx, a/b, √x, Σ, x², π`;
+6. INTERDIT d'utiliser LaTeX (\(...\), \[...\], \frac{}{}, \sqrt{}, \cos, \sin). Utilise uniquement du texte lisible : cos(θ) = adjacent/hypoténuse, sin(x), √x, x², a/b, ∫f(x)dx, Σ, π.`;
 
     const openai = new OpenAI({ apiKey: openaiKey.value() });
 
@@ -130,11 +132,26 @@ Règles strictes :
     try {
       const parsed = JSON.parse(raw);
       if (parsed.answer && typeof parsed.answer === "string") {
-        parsed.answer = parsed.answer
-          .replace(/```json[\s\S]*?```/g, "")
-          .replace(/```[\s\S]*?```/g, "")
-          .trim();
-      }
+  parsed.answer = parsed.answer
+    .replace(/```json[\s\S]*?```/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\\\([\s\S]*?\\\)/g, (match: string) =>
+      match.replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, "$1/$2")
+           .replace(/\\sqrt\{([^}]*)\}/g, "√($1)")
+           .replace(/\\cos/g, "cos")
+           .replace(/\\sin/g, "sin")
+           .replace(/\\tan/g, "tan")
+           .replace(/\\\(|\\\)/g, "")
+           .trim()
+    )
+    .replace(/\\\[[\s\S]*?\\\]/g, (match: string) =>
+      match.replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, "$1/$2")
+           .replace(/\\sqrt\{([^}]*)\}/g, "√($1)")
+           .replace(/\\\[|\\\]/g, "")
+           .trim()
+    )
+    .trim();
+}
       return parsed;
     } catch {
       return { answer: raw, rejected: false };
