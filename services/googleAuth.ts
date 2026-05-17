@@ -1,9 +1,5 @@
 // services/googleAuth.ts
 import {
-  GoogleSignin,
-  statusCodes,
-} from "@react-native-google-signin/google-signin";
-import {
   GoogleAuthProvider,
   signInWithCredential,
   getAuth,
@@ -16,10 +12,26 @@ import {
 } from "firebase/firestore";
 import app from "../src/config/firebase";
 
+// Import conditionnel pour éviter le crash dans Expo Go
+let GoogleSignin: any = null;
+let statusCodes: any = {
+  SIGN_IN_CANCELLED: "SIGN_IN_CANCELLED",
+  IN_PROGRESS: "IN_PROGRESS",
+};
+
+try {
+  const module = require("@react-native-google-signin/google-signin");
+  GoogleSignin = module.GoogleSignin;
+  statusCodes = module.statusCodes;
+} catch (e) {
+  console.log("Google Sign-In not available in Expo Go");
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 export const configureGoogleSignIn = () => {
+  if (!GoogleSignin) return;
   GoogleSignin.configure({
     webClientId: "890891684306-fql2d3ub6i04risnuab7bfb9faloi4hq.apps.googleusercontent.com",
     offlineAccess: false,
@@ -33,6 +45,10 @@ export type GoogleSignInResult =
   | { status: "error"; message: string };
 
 export const signInWithGoogle = async (): Promise<GoogleSignInResult> => {
+  if (!GoogleSignin) {
+    return { status: "error", message: "Google Sign-In not available in Expo Go" };
+  }
+
   try {
     await GoogleSignin.hasPlayServices();
     await GoogleSignin.signIn();

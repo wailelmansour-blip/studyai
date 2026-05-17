@@ -115,6 +115,7 @@ export default function RootLayout() {
         <Stack.Screen name="notification-settings" />
         <Stack.Screen name="history-settings" />
         <Stack.Screen name="premium" options={{ headerShown: false }} />
+        <Stack.Screen name="search" options={{ headerShown: false }} />
       </Stack>
     </View>
   );

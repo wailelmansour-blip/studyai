@@ -26,62 +26,13 @@ interface FeatureCard {
 }
 
 const FEATURES: FeatureCard[] = [
-  {
-    icon: "document-text-outline",
-    titleKey: "summary_screen_title",
-    descKey: "summary_desc",
-    route: "/summary",
-    gradient: ["#6366F1", "#8B5CF6"],
-    emoji: "📋",
-  },
-  {
-    icon: "bulb-outline",
-    titleKey: "explain_title_screen",
-    descKey: "explain_desc",
-    route: "/explain",
-    gradient: ["#F59E0B", "#EF4444"],
-    emoji: "💡",
-  },
-  {
-    icon: "calculator-outline",
-    titleKey: "solve_title_screen",
-    descKey: "solve_desc",
-    route: "/solve",
-    gradient: ["#10B981", "#059669"],
-    emoji: "🧮",
-  },
-  {
-    icon: "layers-outline",
-    titleKey: "flashcards_title_screen",
-    descKey: "flashcards_desc",
-    route: "/flashcards",
-    gradient: ["#3B82F6", "#1D4ED8"],
-    emoji: "🃏",
-  },
-  {
-    icon: "help-circle-outline",
-    titleKey: "quiz_screen_title",
-    descKey: "quiz_desc",
-    route: "/quiz",
-    gradient: ["#EC4899", "#BE185D"],
-    emoji: "❓",
-  },
-  {
-    icon: "calendar-outline",
-    titleKey: "plan_screen_title",
-    descKey: "plan_desc",
-    route: "/plan",
-    gradient: ["#14B8A6", "#0F766E"],
-    emoji: "📅",
-  },
-  {
-    icon: "chatbubbles-outline",
-    titleKey: "chat_screen_title",
-    descKey: "chat_desc",
-    route: "/chat",
-    gradient: ["#F97316", "#EA580C"],
-    emoji: "💬",
-  },
+  { icon: "document-text-outline", titleKey: "summary_screen_title", descKey: "summary_desc", route: "/summary", gradient: ["#6366F1", "#8B5CF6"], emoji: "📋" },
+  { icon: "bulb-outline", titleKey: "explain_title_screen", descKey: "explain_desc", route: "/explain", gradient: ["#F59E0B", "#EF4444"], emoji: "💡" },
+  { icon: "calculator-outline", titleKey: "solve_title_screen", descKey: "solve_desc", route: "/solve", gradient: ["#10B981", "#059669"], emoji: "🧮" },
+  { icon: "layers-outline", titleKey: "flashcards_title_screen", descKey: "flashcards_desc", route: "/flashcards", gradient: ["#3B82F6", "#1D4ED8"], emoji: "🃏" },
+  { icon: "help-circle-outline", titleKey: "quiz_screen_title", descKey: "quiz_desc", route: "/quiz", gradient: ["#EC4899", "#BE185D"], emoji: "❓" },
+  { icon: "calendar-outline", titleKey: "plan_screen_title", descKey: "plan_desc", route: "/plan", gradient: ["#14B8A6", "#0F766E"], emoji: "📅" },
+  { icon: "chatbubbles-outline", titleKey: "chat_screen_title", descKey: "chat_desc", route: "/chat", gradient: ["#F97316", "#EA580C"], emoji: "💬" },
 ];
 
 export default function HomeScreen() {
@@ -91,15 +42,13 @@ export default function HomeScreen() {
   const { usage } = useUsageStore();
   const isRTL = currentLanguage === "ar";
 
-  const displayName = storedFirstName || "";
-
-const greeting = storedFirstName
-  ? currentLanguage === "ar" ? `مرحباً، ${storedFirstName} 👋`
-    : currentLanguage === "en" ? `Hello, ${storedFirstName} 👋`
-    : `Bonjour, ${storedFirstName} 👋`
-  : currentLanguage === "ar" ? "مرحباً 👋"
-    : currentLanguage === "en" ? "Hello 👋"
-    : "Bonjour 👋";
+  const greeting = storedFirstName
+    ? currentLanguage === "ar" ? `مرحباً، ${storedFirstName} 👋`
+      : currentLanguage === "en" ? `Hello, ${storedFirstName} 👋`
+      : `Bonjour, ${storedFirstName} 👋`
+    : currentLanguage === "ar" ? "مرحباً 👋"
+      : currentLanguage === "en" ? "Hello 👋"
+      : "Bonjour 👋";
 
   const subtitle =
     currentLanguage === "ar" ? "ماذا تريد أن تتعلم اليوم؟"
@@ -128,7 +77,7 @@ const greeting = storedFirstName
             borderBottomRightRadius: 32,
           }}
         >
-          {/* Greeting */}
+          {/* Greeting + Avatar + Recherche */}
           <View style={{
             flexDirection: isRTL ? "row-reverse" : "row",
             justifyContent: "space-between", alignItems: "center",
@@ -148,23 +97,42 @@ const greeting = storedFirstName
                 {subtitle}
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={() => router.push("/(tabs)/profile")}
-              style={{
-                width: 48, height: 48, borderRadius: 24,
-                backgroundColor: "rgba(255,255,255,0.2)",
-                alignItems: "center", justifyContent: "center",
-                marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0,
-              }}
-            >
-              {storedFirstName ? (
-  <Text style={{ fontSize: 20, fontWeight: "700", color: "#FFF" }}>
-    {storedFirstName.charAt(0).toUpperCase()}
-  </Text>
-) : (
-  <Ionicons name="person-outline" size={22} color="#FFF" />
-)}
-            </TouchableOpacity>
+
+            <View style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              alignItems: "center", gap: 10,
+              marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0,
+            }}>
+              {/* Bouton Recherche */}
+              <TouchableOpacity
+                onPress={() => router.push("/search" as any)}
+                style={{
+                  width: 44, height: 44, borderRadius: 22,
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <Ionicons name="search-outline" size={20} color="#FFF" />
+              </TouchableOpacity>
+
+              {/* Avatar */}
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/profile")}
+                style={{
+                  width: 44, height: 44, borderRadius: 22,
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  alignItems: "center", justifyContent: "center",
+                }}
+              >
+                {storedFirstName ? (
+                  <Text style={{ fontSize: 20, fontWeight: "700", color: "#FFF" }}>
+                    {storedFirstName.charAt(0).toUpperCase()}
+                  </Text>
+                ) : (
+                  <Ionicons name="person-outline" size={22} color="#FFF" />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Usage Card */}
@@ -215,7 +183,11 @@ const greeting = storedFirstName
         </LinearGradient>
 
         {/* ── Section titre ── */}
-        <View style={{ paddingHorizontal: 24, paddingTop: 28, paddingBottom: 16 }}>
+        <View style={{
+          paddingHorizontal: 24, paddingTop: 28, paddingBottom: 16,
+          flexDirection: isRTL ? "row-reverse" : "row",
+          justifyContent: "space-between", alignItems: "center",
+        }}>
           <Text style={{
             fontSize: 20, fontWeight: "800", color: "#111827",
             textAlign: isRTL ? "right" : "left",

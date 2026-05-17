@@ -32,13 +32,34 @@ export default function HistorySettingsScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
         {/* Header */}
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 24 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}>
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+        <View style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          alignItems: "center", justifyContent: "space-between",
+          marginBottom: 24,
+        }}>
+          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center" }}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+            >
+              <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
+              🕒 {getLabel("Historique & Sauvegardes", "History & Saved", "السجل والمحفوظات")}
+            </Text>
+          </View>
+
+          {/* Bouton Recherche */}
+          <TouchableOpacity
+            onPress={() => router.push("/search" as any)}
+            style={{
+              width: 40, height: 40, borderRadius: 12,
+              backgroundColor: "#EEF2FF",
+              alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <Ionicons name="search-outline" size={20} color="#6366F1" />
           </TouchableOpacity>
-          <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
-            🕒 {getLabel("Historique & Sauvegardes", "History & Saved", "السجل والمحفوظات")}
-          </Text>
         </View>
 
         {/* Info */}
