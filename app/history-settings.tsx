@@ -125,6 +125,7 @@ export default function HistorySettingsScreen() {
                 >
                   <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
                     {getLabel("Effacer", "Clear", "حذف")}
+                    
                   </Text>
                 </TouchableOpacity>
               </View>
