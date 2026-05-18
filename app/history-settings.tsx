@@ -32,12 +32,11 @@ export default function HistorySettingsScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
         {/* Header */}
-        <View style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
-          alignItems: "center", justifyContent: "space-between",
-          marginBottom: 24,
-        }}>
-          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center" }}>
+        <View style={{ marginBottom: 24 }}>
+          <View style={{
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center", marginBottom: 12,
+          }}>
             <TouchableOpacity
               onPress={() => router.back()}
               style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
@@ -49,16 +48,28 @@ export default function HistorySettingsScreen() {
             </Text>
           </View>
 
-          {/* Bouton Recherche */}
+          {/* Barre de recherche */}
           <TouchableOpacity
             onPress={() => router.push("/search" as any)}
             style={{
-              width: 40, height: 40, borderRadius: 12,
-              backgroundColor: "#EEF2FF",
-              alignItems: "center", justifyContent: "center",
+              flexDirection: isRTL ? "row-reverse" : "row",
+              alignItems: "center", gap: 10,
+              backgroundColor: "#F3F4F6", borderRadius: 12,
+              padding: 12, borderWidth: 1, borderColor: "#E5E7EB",
             }}
           >
-            <Ionicons name="search-outline" size={20} color="#6366F1" />
+            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+            <Text style={{
+              fontSize: 14, color: "#9CA3AF", flex: 1,
+              textAlign: isRTL ? "right" : "left",
+            }}>
+              {getLabel(
+                "Rechercher dans l'historique...",
+                "Search history...",
+                "بحث في السجل..."
+              )}
+            </Text>
+            <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
           </TouchableOpacity>
         </View>
 
