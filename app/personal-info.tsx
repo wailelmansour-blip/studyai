@@ -11,10 +11,14 @@ import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 import { getApp } from "firebase/app";
 import { useAuthStore } from "../store/authStore";
 import { useLanguageStore } from "../store/languageStore";
+import { useThemeStore } from "../store/themeStore";
+import { Colors } from "../constants/colors";
 
 export default function PersonalInfoScreen() {
   const { user, setFirstName: setStoreFirstName } = useAuthStore();
   const { currentLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
   const db = getFirestore(getApp());
 
@@ -31,9 +35,7 @@ export default function PersonalInfoScreen() {
   const getLabel = (fr: string, en: string, ar: string) =>
     currentLanguage === "ar" ? ar : currentLanguage === "en" ? en : fr;
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  useEffect(() => { loadProfile(); }, []);
 
   const loadProfile = async () => {
     if (!user) return;
@@ -91,45 +93,62 @@ export default function PersonalInfoScreen() {
   };
 
   const fields = [
-    { icon: "person-outline", label: getLabel("Prénom", "First name", "الاسم الأول"), value: firstName || "—" },
-    { icon: "people-outline", label: getLabel("Nom", "Last name", "اسم العائلة"), value: lastName || "—" },
-    { icon: "calendar-number-outline", label: getLabel("Âge", "Age", "العمر"), value: age ? `${age} ${getLabel("ans", "years", "سنة")}` : "—" },
-    { icon: "mail-outline", label: "Email", value: user?.email || "—", readonly: true },
-    { icon: "shield-checkmark-outline", label: getLabel("Statut", "Status", "الحالة"), value: getLabel("Compte vérifié ✓", "Verified account ✓", "حساب موثق ✓"), color: "#10B981" },
+    { icon: "person-outline",           label: getLabel("Prénom", "First name", "الاسم الأول"),           value: firstName || "—" },
+    { icon: "people-outline",           label: getLabel("Nom", "Last name", "اسم العائلة"),               value: lastName || "—" },
+    { icon: "calendar-number-outline",  label: getLabel("Âge", "Age", "العمر"),                           value: age ? `${age} ${getLabel("ans", "years", "سنة")}` : "—" },
+    { icon: "mail-outline",             label: "Email",                                                    value: user?.email || "—", readonly: true },
+    { icon: "shield-checkmark-outline", label: getLabel("Statut", "Status", "الحالة"),                    value: getLabel("Compte vérifié ✓", "Verified account ✓", "حساب موثق ✓"), color: "#10B981" },
   ];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
         {/* Header */}
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 24 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}>
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+        <View style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          alignItems: "center", marginBottom: 24,
+        }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
+          >
+            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={C.text} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>
               {getLabel("Informations personnelles", "Personal Information", "المعلومات الشخصية")}
             </Text>
           </View>
           {!editing && !loading && (
-            <TouchableOpacity onPress={handleEdit} style={{ backgroundColor: "#EEF2FF", borderRadius: 10, padding: 8 }}>
-              <Ionicons name="create-outline" size={20} color="#6366F1" />
+            <TouchableOpacity
+              onPress={handleEdit}
+              style={{ backgroundColor: C.primaryLight, borderRadius: 10, padding: 8 }}
+            >
+              <Ionicons name="create-outline" size={20} color={C.primary} />
             </TouchableOpacity>
           )}
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />
+
         ) : editing ? (
-          <View style={{ backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16, borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16 }}>
+          /* ── Mode édition ── */
+          <View style={{
+            backgroundColor: C.card, borderRadius: 14, padding: 16,
+            borderWidth: 1, borderColor: C.border, marginBottom: 16,
+          }}>
             {[
-              { label: getLabel("Prénom", "First name", "الاسم الأول"), value: editFirstName, setter: setEditFirstName, capitalize: "words" as const },
-              { label: getLabel("Nom", "Last name", "اسم العائلة"), value: editLastName, setter: setEditLastName, capitalize: "words" as const },
-              { label: getLabel("Âge", "Age", "العمر"), value: editAge, setter: setEditAge, keyboard: "numeric" as const },
+              { label: getLabel("Prénom", "First name", "الاسم الأول"),   value: editFirstName, setter: setEditFirstName, capitalize: "words" as const },
+              { label: getLabel("Nom", "Last name", "اسم العائلة"),       value: editLastName,  setter: setEditLastName,  capitalize: "words" as const },
+              { label: getLabel("Âge", "Age", "العمر"),                   value: editAge,       setter: setEditAge,       keyboard: "numeric" as const },
             ].map((field, index) => (
               <View key={index} style={{ marginBottom: 14 }}>
-                <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
+                <Text style={{
+                  fontSize: 12, color: C.textTertiary,
+                  marginBottom: 6, textAlign: isRTL ? "right" : "left",
+                }}>
                   {field.label}
                 </Text>
                 <TextInput
@@ -139,40 +158,71 @@ export default function PersonalInfoScreen() {
                   keyboardType={field.keyboard || "default"}
                   textAlign={isRTL ? "right" : "left"}
                   style={{
-                    backgroundColor: "#F8F9FA", borderWidth: 1, borderColor: "#E5E7EB",
-                    borderRadius: 10, padding: 12, fontSize: 15, color: "#111827",
+                    backgroundColor: C.background,
+                    borderWidth: 1, borderColor: C.borderMedium,
+                    borderRadius: 10, padding: 12,
+                    fontSize: 15, color: C.text,
                   }}
                 />
               </View>
             ))}
 
-            <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>
-              Email — <Text style={{ color: "#D1D5DB" }}>{getLabel("Non modifiable", "Read only", "غير قابل للتعديل")}</Text>
+            {/* Email readonly */}
+            <Text style={{
+              fontSize: 12, color: C.textTertiary,
+              marginBottom: 6, textAlign: isRTL ? "right" : "left",
+            }}>
+              Email — <Text style={{ color: C.borderMedium }}>
+                {getLabel("Non modifiable", "Read only", "غير قابل للتعديل")}
+              </Text>
             </Text>
-            <View style={{ backgroundColor: "#F3F4F6", borderRadius: 10, padding: 12, marginBottom: 20 }}>
-              <Text style={{ fontSize: 15, color: "#9CA3AF" }}>{user?.email}</Text>
+            <View style={{
+              backgroundColor: isDark ? "#0F172A" : "#F3F4F6",
+              borderRadius: 10, padding: 12, marginBottom: 20,
+            }}>
+              <Text style={{ fontSize: 15, color: C.textTertiary }}>{user?.email}</Text>
             </View>
 
+            {/* Boutons Annuler / Enregistrer */}
             <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
               <TouchableOpacity
                 onPress={() => setEditing(false)}
-                style={{ flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB" }}
+                style={{
+                  flex: 1, borderRadius: 10, padding: 12,
+                  alignItems: "center",
+                  backgroundColor: isDark ? "#1E293B" : "#F3F4F6",
+                  borderWidth: 1, borderColor: C.borderMedium,
+                }}
               >
-                <Text style={{ fontWeight: "600", color: "#374151" }}>{getLabel("Annuler", "Cancel", "إلغاء")}</Text>
+                <Text style={{ fontWeight: "600", color: C.text }}>
+                  {getLabel("Annuler", "Cancel", "إلغاء")}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSave}
                 disabled={saving}
-                style={{ flex: 1, borderRadius: 10, padding: 12, alignItems: "center", backgroundColor: saving ? "#A5B4FC" : "#6366F1" }}
+                style={{
+                  flex: 1, borderRadius: 10, padding: 12, alignItems: "center",
+                  backgroundColor: saving ? (isDark ? "#3730A3" : "#A5B4FC") : C.primary,
+                }}
               >
-                {saving ? <ActivityIndicator size="small" color="#FFF" /> : (
-                  <Text style={{ fontWeight: "600", color: "#FFF" }}>{getLabel("Enregistrer", "Save", "حفظ")}</Text>
-                )}
+                {saving
+                  ? <ActivityIndicator size="small" color="#FFF" />
+                  : <Text style={{ fontWeight: "600", color: "#FFF" }}>
+                      {getLabel("Enregistrer", "Save", "حفظ")}
+                    </Text>
+                }
               </TouchableOpacity>
             </View>
           </View>
+
         ) : (
-          <View style={{ backgroundColor: "#FFFFFF", borderRadius: 14, borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 16, overflow: "hidden" }}>
+          /* ── Mode lecture ── */
+          <View style={{
+            backgroundColor: C.card, borderRadius: 14,
+            borderWidth: 1, borderColor: C.border,
+            marginBottom: 16, overflow: "hidden",
+          }}>
             {fields.map((field, index) => (
               <View
                 key={index}
@@ -180,28 +230,46 @@ export default function PersonalInfoScreen() {
                   flexDirection: isRTL ? "row-reverse" : "row",
                   alignItems: "center", padding: 16,
                   borderBottomWidth: index < fields.length - 1 ? 1 : 0,
-                  borderBottomColor: "#F3F4F6",
+                  borderBottomColor: C.border,
                 }}
               >
                 <View style={{
                   width: 36, height: 36, borderRadius: 10,
-                  backgroundColor: field.color ? "#10B98115" : "#EEF2FF",
+                  backgroundColor: field.color
+                    ? (isDark ? "#022C22" : "#10B98115")
+                    : C.primaryLight,
                   alignItems: "center", justifyContent: "center",
                   marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
                 }}>
-                  <Ionicons name={field.icon as any} size={18} color={field.color || "#6366F1"} />
+                  <Ionicons
+                    name={field.icon as any}
+                    size={18}
+                    color={field.color || C.primary}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 2, textAlign: isRTL ? "right" : "left" }}>
+                  <Text style={{
+                    fontSize: 12, color: C.textTertiary,
+                    marginBottom: 2, textAlign: isRTL ? "right" : "left",
+                  }}>
                     {field.label}
                   </Text>
-                  <Text style={{ fontSize: 14, color: field.color || "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+                  <Text style={{
+                    fontSize: 14,
+                    color: field.color || C.text,
+                    fontWeight: "500", textAlign: isRTL ? "right" : "left",
+                  }}>
                     {field.value}
                   </Text>
                 </View>
                 {field.readonly && (
-                  <View style={{ backgroundColor: "#F3F4F6", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 11, color: "#9CA3AF" }}>{getLabel("Non modifiable", "Read only", "غير قابل للتعديل")}</Text>
+                  <View style={{
+                    backgroundColor: isDark ? "#1E293B" : "#F3F4F6",
+                    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3,
+                  }}>
+                    <Text style={{ fontSize: 11, color: C.textTertiary }}>
+                      {getLabel("Non modifiable", "Read only", "غير قابل للتعديل")}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -213,22 +281,29 @@ export default function PersonalInfoScreen() {
         <TouchableOpacity
           onPress={() => router.push("/changePassword" as any)}
           style={{
-            backgroundColor: "#FFFFFF", borderRadius: 14, padding: 16,
+            backgroundColor: C.card, borderRadius: 14, padding: 16,
             flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center",
-            borderWidth: 1, borderColor: "#F3F4F6",
+            borderWidth: 1, borderColor: C.border,
           }}
         >
           <View style={{
-            width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF",
+            width: 36, height: 36, borderRadius: 10,
+            backgroundColor: C.primaryLight,
             alignItems: "center", justifyContent: "center",
             marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
           }}>
-            <Ionicons name="lock-closed-outline" size={18} color="#6366F1" />
+            <Ionicons name="lock-closed-outline" size={18} color={C.primary} />
           </View>
-          <Text style={{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+          <Text style={{
+            flex: 1, fontSize: 14, color: C.text,
+            fontWeight: "500", textAlign: isRTL ? "right" : "left",
+          }}>
             {getLabel("Modifier le mot de passe", "Change password", "تغيير كلمة المرور")}
           </Text>
-          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
+          <Ionicons
+            name={isRTL ? "chevron-back" : "chevron-forward"}
+            size={16} color={C.borderMedium}
+          />
         </TouchableOpacity>
 
       </ScrollView>

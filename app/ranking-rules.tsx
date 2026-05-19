@@ -5,9 +5,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useLanguageStore } from "../store/languageStore";
+import { useThemeStore } from "../store/themeStore";
+import { Colors } from "../constants/colors";
 
 export default function RankingRulesScreen() {
   const { currentLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
 
   const getLabel = (fr: string, en: string, ar: string) =>
@@ -26,7 +30,7 @@ export default function RankingRulesScreen() {
   ];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
         {/* Header */}
@@ -38,13 +42,13 @@ export default function RankingRulesScreen() {
             onPress={() => router.back()}
             style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
           >
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={C.text} />
           </TouchableOpacity>
           <View>
-            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>
               {getLabel("Règles du classement", "Ranking Rules", "قواعد التصنيف")}
             </Text>
-            <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+            <Text style={{ fontSize: 13, color: C.textSecondary, marginTop: 2 }}>
               {getLabel("Comment gagner des points ?", "How to earn points?", "كيف تكسب النقاط؟")}
             </Text>
           </View>
@@ -52,14 +56,16 @@ export default function RankingRulesScreen() {
 
         {/* Intro */}
         <View style={{
-          backgroundColor: "#EEF2FF", borderRadius: 14,
+          backgroundColor: C.primaryLight, borderRadius: 14,
           padding: 16, marginBottom: 24,
           flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "flex-start", gap: 12,
+          borderWidth: 1, borderColor: isDark ? "#3730A3" : "#C7D2FE",
         }}>
           <Text style={{ fontSize: 28 }}>🏆</Text>
           <Text style={{
-            flex: 1, fontSize: 13, color: "#3730A3",
+            flex: 1, fontSize: 13,
+            color: isDark ? C.primaryDark : "#3730A3",
             lineHeight: 20, textAlign: isRTL ? "right" : "left",
           }}>
             {getLabel(
@@ -72,15 +78,15 @@ export default function RankingRulesScreen() {
 
         {/* Points */}
         <Text style={{
-          fontSize: 15, fontWeight: "700", color: "#111827",
+          fontSize: 15, fontWeight: "700", color: C.text,
           marginBottom: 12, textAlign: isRTL ? "right" : "left",
         }}>
           ⚡ {getLabel("Système de points", "Points System", "نظام النقاط")}
         </Text>
 
         <View style={{
-          backgroundColor: "#FFFFFF", borderRadius: 14,
-          borderWidth: 1, borderColor: "#F3F4F6",
+          backgroundColor: C.card, borderRadius: 14,
+          borderWidth: 1, borderColor: C.border,
           marginBottom: 24, overflow: "hidden",
         }}>
           {points.map((item, index) => (
@@ -90,7 +96,7 @@ export default function RankingRulesScreen() {
                 flexDirection: isRTL ? "row-reverse" : "row",
                 alignItems: "center", padding: 14,
                 borderBottomWidth: index < points.length - 1 ? 1 : 0,
-                borderBottomColor: "#F3F4F6",
+                borderBottomColor: C.border,
               }}
             >
               <Text style={{
@@ -101,16 +107,16 @@ export default function RankingRulesScreen() {
                 {item.icon}
               </Text>
               <Text style={{
-                flex: 1, fontSize: 14, color: "#374151",
+                flex: 1, fontSize: 14, color: C.text,
                 textAlign: isRTL ? "right" : "left",
               }}>
                 {item.action}
               </Text>
               <View style={{
-                backgroundColor: "#EEF2FF", borderRadius: 8,
+                backgroundColor: C.primaryLight, borderRadius: 8,
                 paddingHorizontal: 10, paddingVertical: 4,
               }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "#6366F1" }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: C.primary }}>
                   {item.pts}
                 </Text>
               </View>
@@ -120,19 +126,21 @@ export default function RankingRulesScreen() {
 
         {/* Streak */}
         <View style={{
-          backgroundColor: "#FFF7ED", borderRadius: 14,
-          padding: 16, marginBottom: 24,
-          borderWidth: 1, borderColor: "#FED7AA",
+          backgroundColor: isDark ? "#2D1B00" : "#FFF7ED",
+          borderRadius: 14, padding: 16, marginBottom: 24,
+          borderWidth: 1, borderColor: isDark ? "#92400E" : "#FED7AA",
         }}>
           <Text style={{
-            fontSize: 14, fontWeight: "700", color: "#92400E",
+            fontSize: 14, fontWeight: "700",
+            color: isDark ? "#FCD34D" : "#92400E",
             marginBottom: 8, textAlign: isRTL ? "right" : "left",
           }}>
             🔥 {getLabel("Comment fonctionne le streak ?", "How does the streak work?", "كيف يعمل الستريك؟")}
           </Text>
           <Text style={{
-            fontSize: 13, color: "#92400E", lineHeight: 20,
-            textAlign: isRTL ? "right" : "left",
+            fontSize: 13,
+            color: isDark ? "#FCD34D" : "#92400E",
+            lineHeight: 20, textAlign: isRTL ? "right" : "left",
           }}>
             {getLabel(
               "Connecte-toi et utilise StudyAI chaque jour pour maintenir ton streak. Si tu rates un jour, ton streak repart de zéro. Chaque jour consécutif te rapporte +2 points bonus.",
@@ -144,21 +152,21 @@ export default function RankingRulesScreen() {
 
         {/* Trophées */}
         <View style={{
-          backgroundColor: "#F3F4F6", borderRadius: 14,
-          padding: 16, marginBottom: 24,
-          borderWidth: 1, borderColor: "#E5E7EB",
+          backgroundColor: isDark ? C.card : "#F3F4F6",
+          borderRadius: 14, padding: 16, marginBottom: 24,
+          borderWidth: 1, borderColor: C.border,
           alignItems: "center",
         }}>
           <Text style={{ fontSize: 32, marginBottom: 8 }}>🏅</Text>
           <Text style={{
-            fontSize: 14, fontWeight: "700", color: "#374151",
+            fontSize: 14, fontWeight: "700", color: C.text,
             marginBottom: 6, textAlign: "center",
           }}>
             {getLabel("Trophées à débloquer", "Trophies to unlock", "جوائز للفتح")}
           </Text>
           <Text style={{
-            fontSize: 13, color: "#6B7280", lineHeight: 20,
-            textAlign: "center",
+            fontSize: 13, color: C.textSecondary,
+            lineHeight: 20, textAlign: "center",
           }}>
             {getLabel(
               "Utilise StudyAI régulièrement pour débloquer des trophées basés sur tes accomplissements.",
@@ -168,21 +176,23 @@ export default function RankingRulesScreen() {
           </Text>
         </View>
 
-        {/* Classement */}
+        {/* Classement mondial */}
         <View style={{
-          backgroundColor: "#F0FDF4", borderRadius: 14,
-          padding: 16,
-          borderWidth: 1, borderColor: "#BBF7D0",
+          backgroundColor: isDark ? "#022C22" : "#F0FDF4",
+          borderRadius: 14, padding: 16,
+          borderWidth: 1, borderColor: isDark ? "#065F46" : "#BBF7D0",
         }}>
           <Text style={{
-            fontSize: 14, fontWeight: "700", color: "#065F46",
+            fontSize: 14, fontWeight: "700",
+            color: isDark ? "#34D399" : "#065F46",
             marginBottom: 8, textAlign: isRTL ? "right" : "left",
           }}>
             📊 {getLabel("Classement mondial", "Global Ranking", "التصنيف العالمي")}
           </Text>
           <Text style={{
-            fontSize: 13, color: "#065F46", lineHeight: 20,
-            textAlign: isRTL ? "right" : "left",
+            fontSize: 13,
+            color: isDark ? "#34D399" : "#065F46",
+            lineHeight: 20, textAlign: isRTL ? "right" : "left",
           }}>
             {getLabel(
               "Le classement affiche les 10 meilleurs utilisateurs du monde entier basé sur leur score total. Il est mis à jour en temps réel. Bonne chance ! 🚀",

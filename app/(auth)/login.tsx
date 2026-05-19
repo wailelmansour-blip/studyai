@@ -17,11 +17,15 @@ import {
 import app from "@/src/config/firebase";
 import { GoogleSignInButton } from "../../components/GoogleSignInButton";
 import { configureGoogleSignIn, signInWithGoogle } from "../../services/googleAuth";
+import { useThemeStore } from "../../store/themeStore";
+import { Colors } from "../../constants/colors";
 
 export default function LoginScreen() {
   const params = useLocalSearchParams<{ email?: string; justRegistered?: string }>();
   const { login, isLoading, clearError } = useAuthStore();
   const { currentLanguage, setLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
 
   const [email, setEmail] = useState(params.email || "");
@@ -78,7 +82,6 @@ export default function LoginScreen() {
       if (result.status === "error") {
         Alert.alert("", t.googleError);
       }
-      // Si success → _layout.tsx gère la navigation automatiquement
     } finally {
       setGoogleLoading(false);
     }
@@ -138,7 +141,7 @@ export default function LoginScreen() {
   const currentLang = LANGUAGES.find((l) => l.code === currentLanguage);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -151,30 +154,30 @@ export default function LoginScreen() {
           <TouchableOpacity
             onPress={() => setShowLangModal(true)}
             style={{
-              flexDirection: "row", alignItems: "center", justifyContent: "flex-end",
-              marginBottom: 24, gap: 6,
+              flexDirection: "row", alignItems: "center",
+              justifyContent: "flex-end", marginBottom: 24, gap: 6,
             }}
           >
             <Text style={{ fontSize: 20 }}>{currentLang?.flag}</Text>
-            <Text style={{ fontSize: 13, color: "#6B7280", fontWeight: "500" }}>
+            <Text style={{ fontSize: 13, color: C.textSecondary, fontWeight: "500" }}>
               {currentLang?.nativeLabel}
             </Text>
-            <Ionicons name="chevron-down" size={14} color="#6B7280" />
+            <Ionicons name="chevron-down" size={14} color={C.textSecondary} />
           </TouchableOpacity>
 
           {/* Logo */}
           <View style={{ alignItems: "center", marginBottom: 40 }}>
             <View style={{
               width: 72, height: 72, borderRadius: 20,
-              backgroundColor: "#6366F1", alignItems: "center",
+              backgroundColor: C.primary, alignItems: "center",
               justifyContent: "center", marginBottom: 16,
             }}>
               <Ionicons name="school" size={36} color="#FFFFFF" />
             </View>
-            <Text style={{ fontSize: 28, fontWeight: "700", color: "#111827" }}>
+            <Text style={{ fontSize: 28, fontWeight: "700", color: C.text }}>
               StudyAI
             </Text>
-            <Text style={{ fontSize: 15, color: "#6B7280", marginTop: 6 }}>
+            <Text style={{ fontSize: 15, color: C.textSecondary, marginTop: 6 }}>
               {t.subtitle}
             </Text>
           </View>
@@ -182,18 +185,21 @@ export default function LoginScreen() {
           {/* Alerte email non vérifié */}
           {showResend && (
             <View style={{
-              backgroundColor: "#FFFBEB", borderRadius: 12, padding: 14,
-              marginBottom: 20, borderWidth: 1, borderColor: "#FCD34D",
+              backgroundColor: isDark ? "#2D1B00" : "#FFFBEB",
+              borderRadius: 12, padding: 14, marginBottom: 20,
+              borderWidth: 1, borderColor: isDark ? "#92400E" : "#FCD34D",
             }}>
               <Text style={{
-                fontSize: 13, color: "#92400E", marginBottom: 8, lineHeight: 20,
+                fontSize: 13,
+                color: isDark ? "#FCD34D" : "#92400E",
+                marginBottom: 8, lineHeight: 20,
                 textAlign: isRTL ? "right" : "left",
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}>
                 {t.notVerified}
               </Text>
               <Text style={{
-                fontSize: 12, color: "#EF4444", marginBottom: 12,
+                fontSize: 12, color: C.danger, marginBottom: 12,
                 lineHeight: 18, fontWeight: "600",
                 textAlign: isRTL ? "right" : "left",
                 writingDirection: isRTL ? "rtl" : "ltr",
@@ -221,8 +227,8 @@ export default function LoginScreen() {
 
           {/* Email */}
           <Text style={{
-            fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8,
-            textAlign: isRTL ? "right" : "left",
+            fontSize: 14, fontWeight: "600", color: C.text,
+            marginBottom: 8, textAlign: isRTL ? "right" : "left",
           }}>
             {t.emailLabel}
           </Text>
@@ -230,21 +236,22 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
             placeholder={t.emailPH}
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={C.textTertiary}
             keyboardType="email-address"
             autoCapitalize="none"
             textAlign={isRTL ? "right" : "left"}
             style={{
-              backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-              borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
-              marginBottom: 16,
+              backgroundColor: C.card,
+              borderWidth: 1, borderColor: C.borderMedium,
+              borderRadius: 12, padding: 14,
+              fontSize: 15, color: C.text, marginBottom: 16,
             }}
           />
 
           {/* Password */}
           <Text style={{
-            fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8,
-            textAlign: isRTL ? "right" : "left",
+            fontSize: 14, fontWeight: "600", color: C.text,
+            marginBottom: 8, textAlign: isRTL ? "right" : "left",
           }}>
             {t.passwordLabel}
           </Text>
@@ -253,13 +260,14 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               placeholder="••••••••"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={C.textTertiary}
               secureTextEntry={!showPassword}
               textAlign={isRTL ? "right" : "left"}
               style={{
-                backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
+                backgroundColor: C.card,
+                borderWidth: 1, borderColor: C.borderMedium,
                 borderRadius: 12, padding: 14, paddingRight: 48,
-                fontSize: 15, color: "#111827",
+                fontSize: 15, color: C.text,
               }}
             />
             <TouchableOpacity
@@ -268,7 +276,7 @@ export default function LoginScreen() {
             >
               <Ionicons
                 name={showPassword ? "eye-off-outline" : "eye-outline"}
-                size={22} color="#9CA3AF"
+                size={22} color={C.textTertiary}
               />
             </TouchableOpacity>
           </View>
@@ -276,9 +284,12 @@ export default function LoginScreen() {
           {/* Mot de passe oublié */}
           <TouchableOpacity
             onPress={handleForgotPassword}
-            style={{ alignItems: isRTL ? "flex-start" : "flex-end", marginBottom: 20, marginTop: 8 }}
+            style={{
+              alignItems: isRTL ? "flex-start" : "flex-end",
+              marginBottom: 20, marginTop: 8,
+            }}
           >
-            <Text style={{ fontSize: 13, color: "#6366F1", fontWeight: "600" }}>
+            <Text style={{ fontSize: 13, color: C.primary, fontWeight: "600" }}>
               {t.forgotPwd}
             </Text>
           </TouchableOpacity>
@@ -288,7 +299,9 @@ export default function LoginScreen() {
             onPress={handleLogin}
             disabled={isLoading}
             style={{
-              backgroundColor: isLoading ? "#A5B4FC" : "#6366F1",
+              backgroundColor: isLoading
+                ? (isDark ? "#3730A3" : "#A5B4FC")
+                : C.primary,
               borderRadius: 14, padding: 16, alignItems: "center",
               elevation: 4, marginBottom: 16,
             }}
@@ -307,9 +320,9 @@ export default function LoginScreen() {
             flexDirection: "row", alignItems: "center",
             marginVertical: 16, gap: 10,
           }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
-            <Text style={{ fontSize: 13, color: "#9CA3AF" }}>{t.or}</Text>
-            <View style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
+            <View style={{ flex: 1, height: 1, backgroundColor: C.borderMedium }} />
+            <Text style={{ fontSize: 13, color: C.textTertiary }}>{t.or}</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: C.borderMedium }} />
           </View>
 
           {/* Bouton Google */}
@@ -324,9 +337,9 @@ export default function LoginScreen() {
             onPress={() => router.push("/(auth)/signup")}
             style={{ alignItems: "center", padding: 8, marginTop: 16 }}
           >
-            <Text style={{ fontSize: 14, color: "#6B7280" }}>
+            <Text style={{ fontSize: 14, color: C.textSecondary }}>
               {t.noAccount}
-              <Text style={{ color: "#6366F1", fontWeight: "600" }}>
+              <Text style={{ color: C.primary, fontWeight: "600" }}>
                 {t.createAccount}
               </Text>
             </Text>
@@ -342,16 +355,20 @@ export default function LoginScreen() {
         onRequestClose={() => setShowLangModal(false)}
       >
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: "#00000050" }}
+          style={{ flex: 1, backgroundColor: C.overlay }}
           onPress={() => setShowLangModal(false)}
           activeOpacity={1}
         >
           <View style={{
             position: "absolute", bottom: 0, left: 0, right: 0,
-            backgroundColor: "#FFFFFF", borderTopLeftRadius: 20,
-            borderTopRightRadius: 20, padding: 24, paddingBottom: 40,
+            backgroundColor: C.card,
+            borderTopLeftRadius: 20, borderTopRightRadius: 20,
+            padding: 24, paddingBottom: 40,
           }}>
-            <Text style={{ fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 20 }}>
+            <Text style={{
+              fontSize: 18, fontWeight: "700", color: C.text,
+              marginBottom: 20, textAlign: isRTL ? "right" : "left",
+            }}>
               {t.selectLang}
             </Text>
             {LANGUAGES.map((lang) => (
@@ -359,24 +376,41 @@ export default function LoginScreen() {
                 key={lang.code}
                 onPress={() => handleLanguageChange(lang.code)}
                 style={{
-                  flexDirection: "row", alignItems: "center", padding: 16,
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center", padding: 16,
                   borderRadius: 12, marginBottom: 8,
-                  backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "#F8F9FA",
+                  backgroundColor: currentLanguage === lang.code
+                    ? C.primaryLight
+                    : C.background,
                   borderWidth: 1.5,
-                  borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
+                  borderColor: currentLanguage === lang.code
+                    ? C.primary
+                    : "transparent",
                 }}
               >
-                <Text style={{ fontSize: 28, marginRight: 14 }}>{lang.flag}</Text>
+                <Text style={{
+                  fontSize: 28,
+                  marginRight: isRTL ? 0 : 14,
+                  marginLeft: isRTL ? 14 : 0,
+                }}>
+                  {lang.flag}
+                </Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#111827" }}>
+                  <Text style={{
+                    fontSize: 15, fontWeight: "600", color: C.text,
+                    textAlign: isRTL ? "right" : "left",
+                  }}>
                     {lang.nativeLabel}
                   </Text>
-                  <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+                  <Text style={{
+                    fontSize: 13, color: C.textSecondary, marginTop: 2,
+                    textAlign: isRTL ? "right" : "left",
+                  }}>
                     {lang.label}
                   </Text>
                 </View>
                 {currentLanguage === lang.code && (
-                  <Ionicons name="checkmark-circle" size={22} color="#6366F1" />
+                  <Ionicons name="checkmark-circle" size={22} color={C.primary} />
                 )}
               </TouchableOpacity>
             ))}

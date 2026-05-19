@@ -10,12 +10,16 @@ import { router } from "expo-router";
 import { useLanguageStore } from "../store/languageStore";
 import { useStreakStore } from "../store/streakStore";
 import { useAuthStore } from "../store/authStore";
+import { useThemeStore } from "../store/themeStore";
+import { Colors } from "../constants/colors";
 
 export default function LeaderboardScreen() {
   const { currentLanguage } = useLanguageStore();
   const isRTL = currentLanguage === "ar";
   const { user } = useAuthStore();
   const { stats, leaderboard, isLoading, loadStats, loadLeaderboard } = useStreakStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const [refreshing, setRefreshing] = useState(false);
 
   const getLabel = (fr: string, en: string, ar: string) =>
@@ -42,10 +46,17 @@ export default function LeaderboardScreen() {
   const myRank = leaderboard.findIndex((u) => u.userId === user?.uid);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
       <ScrollView
         contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={C.primary}
+            colors={[C.primary]}
+          />
+        }
       >
         {/* Header */}
         <View style={{
@@ -56,32 +67,31 @@ export default function LeaderboardScreen() {
             onPress={() => router.back()}
             style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
           >
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={C.text} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>
               🏆 {getLabel("Classement", "Leaderboard", "التصنيف")}
             </Text>
-            <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+            <Text style={{ fontSize: 13, color: C.textSecondary, marginTop: 2 }}>
               {getLabel("Top 10 mondial", "Global Top 10", "أفضل 10 عالميًا")}
             </Text>
           </View>
           <TouchableOpacity
             onPress={() => router.push("/ranking-rules" as any)}
             style={{
-              backgroundColor: "#EEF2FF", borderRadius: 10,
-              padding: 8,
+              backgroundColor: C.primaryLight, borderRadius: 10, padding: 8,
             }}
           >
-            <Ionicons name="information-circle-outline" size={22} color="#6366F1" />
+            <Ionicons name="information-circle-outline" size={22} color={C.primary} />
           </TouchableOpacity>
         </View>
 
         {/* Ma position + streak */}
         {stats && (
           <View style={{
-            backgroundColor: "#6366F1", borderRadius: 16,
-            padding: 16, marginBottom: 24,
+            backgroundColor: isDark ? "#3730A3" : "#6366F1",
+            borderRadius: 16, padding: 16, marginBottom: 24,
           }}>
             <View style={{
               flexDirection: isRTL ? "row-reverse" : "row",
@@ -138,7 +148,7 @@ export default function LeaderboardScreen() {
         {stats && stats.trophies.length > 0 && (
           <View style={{ marginBottom: 24 }}>
             <Text style={{
-              fontSize: 15, fontWeight: "700", color: "#111827",
+              fontSize: 15, fontWeight: "700", color: C.text,
               marginBottom: 12, textAlign: isRTL ? "right" : "left",
             }}>
               🏅 {getLabel("Mes trophées", "My Trophies", "جوائزي")} ({stats.trophies.length})
@@ -149,14 +159,14 @@ export default function LeaderboardScreen() {
                   <View
                     key={trophy.id}
                     style={{
-                      backgroundColor: "#FFFFFF", borderRadius: 14,
+                      backgroundColor: C.card, borderRadius: 14,
                       padding: 14, alignItems: "center", minWidth: 90,
-                      borderWidth: 1, borderColor: "#F3F4F6",
+                      borderWidth: 1, borderColor: C.border,
                     }}
                   >
                     <Text style={{ fontSize: 30 }}>{trophy.icon}</Text>
                     <Text style={{
-                      fontSize: 11, fontWeight: "600", color: "#374151",
+                      fontSize: 11, fontWeight: "600", color: C.text,
                       marginTop: 6, textAlign: "center",
                     }}>
                       {currentLanguage === "ar" ? trophy.nameAr
@@ -173,18 +183,19 @@ export default function LeaderboardScreen() {
         {/* Trophées vides */}
         {stats && stats.trophies.length === 0 && (
           <View style={{
-            backgroundColor: "#F3F4F6", borderRadius: 14, padding: 16,
-            marginBottom: 24, alignItems: "center",
-            borderWidth: 1, borderColor: "#E5E7EB",
+            backgroundColor: isDark ? C.card : "#F3F4F6",
+            borderRadius: 14, padding: 16, marginBottom: 24,
+            alignItems: "center",
+            borderWidth: 1, borderColor: C.border,
           }}>
             <Text style={{ fontSize: 28, marginBottom: 8 }}>🏅</Text>
             <Text style={{
-              fontSize: 14, fontWeight: "600", color: "#374151",
+              fontSize: 14, fontWeight: "600", color: C.text,
               marginBottom: 4, textAlign: "center",
             }}>
               {getLabel("Aucun trophée encore", "No trophies yet", "لا توجد جوائز بعد")}
             </Text>
-            <Text style={{ fontSize: 13, color: "#6B7280", textAlign: "center", lineHeight: 20 }}>
+            <Text style={{ fontSize: 13, color: C.textSecondary, textAlign: "center", lineHeight: 20 }}>
               {getLabel(
                 "Utilise StudyAI régulièrement pour débloquer des trophées.",
                 "Use StudyAI regularly to unlock trophies.",
@@ -196,22 +207,22 @@ export default function LeaderboardScreen() {
 
         {/* Classement */}
         <Text style={{
-          fontSize: 15, fontWeight: "700", color: "#111827",
+          fontSize: 15, fontWeight: "700", color: C.text,
           marginBottom: 12, textAlign: isRTL ? "right" : "left",
         }}>
           📊 {getLabel("Top 10", "Top 10", "أفضل 10")}
         </Text>
 
         {isLoading ? (
-          <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />
         ) : (
           <View style={{
-            backgroundColor: "#FFFFFF", borderRadius: 14,
-            borderWidth: 1, borderColor: "#F3F4F6", overflow: "hidden",
+            backgroundColor: C.card, borderRadius: 14,
+            borderWidth: 1, borderColor: C.border, overflow: "hidden",
           }}>
             {leaderboard.length === 0 ? (
               <View style={{ padding: 32, alignItems: "center" }}>
-                <Text style={{ fontSize: 13, color: "#9CA3AF" }}>
+                <Text style={{ fontSize: 13, color: C.textTertiary }}>
                   {getLabel("Aucun utilisateur encore.", "No users yet.", "لا يوجد مستخدمون بعد.")}
                 </Text>
               </View>
@@ -225,8 +236,8 @@ export default function LeaderboardScreen() {
                       flexDirection: isRTL ? "row-reverse" : "row",
                       alignItems: "center", padding: 14,
                       borderBottomWidth: index < leaderboard.length - 1 ? 1 : 0,
-                      borderBottomColor: "#F3F4F6",
-                      backgroundColor: isMe ? "#EEF2FF" : "#FFFFFF",
+                      borderBottomColor: C.border,
+                      backgroundColor: isMe ? C.primaryLight : C.card,
                     }}
                   >
                     {/* Rang */}
@@ -237,7 +248,7 @@ export default function LeaderboardScreen() {
                       {index < 3 ? (
                         <Text style={{ fontSize: 22 }}>{getMedalEmoji(index)}</Text>
                       ) : (
-                        <Text style={{ fontSize: 15, fontWeight: "700", color: "#6B7280" }}>
+                        <Text style={{ fontSize: 15, fontWeight: "700", color: C.textSecondary }}>
                           {index + 1}
                         </Text>
                       )}
@@ -246,13 +257,13 @@ export default function LeaderboardScreen() {
                     {/* Avatar */}
                     <View style={{
                       width: 38, height: 38, borderRadius: 19,
-                      backgroundColor: isMe ? "#6366F1" : "#E5E7EB",
+                      backgroundColor: isMe ? C.primary : C.borderMedium,
                       alignItems: "center", justifyContent: "center",
                       marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0,
                     }}>
                       <Text style={{
                         fontSize: 16, fontWeight: "700",
-                        color: isMe ? "#FFFFFF" : "#374151",
+                        color: isMe ? "#FFFFFF" : C.text,
                       }}>
                         {entry.displayName.charAt(0).toUpperCase()}
                       </Text>
@@ -266,7 +277,7 @@ export default function LeaderboardScreen() {
                       }}>
                         <Text style={{
                           fontSize: 14, fontWeight: isMe ? "700" : "500",
-                          color: isMe ? "#6366F1" : "#111827",
+                          color: isMe ? C.primary : C.text,
                           textAlign: isRTL ? "right" : "left",
                         }}>
                           {entry.displayName}
@@ -283,11 +294,11 @@ export default function LeaderboardScreen() {
 
                     {/* Score + streak */}
                     <View style={{ alignItems: isRTL ? "flex-start" : "flex-end" }}>
-                      <Text style={{ fontSize: 15, fontWeight: "700", color: "#6366F1" }}>
+                      <Text style={{ fontSize: 15, fontWeight: "700", color: C.primary }}>
                         {entry.totalPoints} pts
                       </Text>
                       {entry.currentStreak > 0 && (
-                        <Text style={{ fontSize: 11, color: "#F59E0B", marginTop: 2 }}>
+                        <Text style={{ fontSize: 11, color: C.warning, marginTop: 2 }}>
                           🔥 {entry.currentStreak}
                         </Text>
                       )}
@@ -303,7 +314,7 @@ export default function LeaderboardScreen() {
         {stats && (
           <View style={{ marginTop: 24 }}>
             <Text style={{
-              fontSize: 15, fontWeight: "700", color: "#111827",
+              fontSize: 15, fontWeight: "700", color: C.text,
               marginBottom: 12, textAlign: isRTL ? "right" : "left",
             }}>
               📈 {getLabel("Mes statistiques", "My Statistics", "إحصائياتي")}
@@ -320,16 +331,16 @@ export default function LeaderboardScreen() {
                 <View
                   key={stat.label}
                   style={{
-                    width: "30%", backgroundColor: "#FFFFFF",
+                    width: "30%", backgroundColor: C.card,
                     borderRadius: 12, padding: 12, alignItems: "center",
-                    borderWidth: 1, borderColor: "#F3F4F6",
+                    borderWidth: 1, borderColor: C.border,
                   }}
                 >
                   <Text style={{ fontSize: 22 }}>{stat.icon}</Text>
-                  <Text style={{ fontSize: 18, fontWeight: "700", color: "#6366F1", marginTop: 4 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "700", color: C.primary, marginTop: 4 }}>
                     {stat.value}
                   </Text>
-                  <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2, textAlign: "center" }}>
+                  <Text style={{ fontSize: 11, color: C.textTertiary, marginTop: 2, textAlign: "center" }}>
                     {stat.label}
                   </Text>
                 </View>

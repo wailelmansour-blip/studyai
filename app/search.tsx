@@ -14,6 +14,8 @@ import {
 import { getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { useLanguageStore } from "../store/languageStore";
+import { useThemeStore } from "../store/themeStore";
+import { Colors } from "../constants/colors";
 
 interface SearchResult {
   id: string;
@@ -24,13 +26,13 @@ interface SearchResult {
 }
 
 const TYPE_CONFIG = {
-  quiz:        { icon: "🧠", color: "#EC4899", bg: "#FDF2F8", label: { fr: "Quiz",          en: "Quiz",          ar: "اختبارات"    } },
-  summary:     { icon: "📄", color: "#6366F1", bg: "#EEF2FF", label: { fr: "Résumés",       en: "Summaries",     ar: "ملخصات"      } },
-  flashcard:   { icon: "🃏", color: "#3B82F6", bg: "#EFF6FF", label: { fr: "Flashcards",    en: "Flashcards",    ar: "بطاقات"      } },
-  plan:        { icon: "📅", color: "#14B8A6", bg: "#F0FDFA", label: { fr: "Plans d'étude", en: "Study Plans",   ar: "خطط الدراسة" } },
-  explanation: { icon: "💡", color: "#F59E0B", bg: "#FFFBEB", label: { fr: "Explications",  en: "Explanations",  ar: "شروحات"      } },
-  solution:    { icon: "✏️", color: "#10B981", bg: "#F0FDF4", label: { fr: "Solutions",     en: "Solutions",     ar: "حلول"        } },
-  chat:        { icon: "💬", color: "#8B5CF6", bg: "#F5F3FF", label: { fr: "Chat IA",       en: "AI Chat",       ar: "محادثات"     } },
+  quiz:        { icon: "🧠", colorLight: "#EC4899", bgLight: "#FDF2F8", colorDark: "#F472B6", bgDark: "#2D0A1E", label: { fr: "Quiz",          en: "Quiz",          ar: "اختبارات"    } },
+  summary:     { icon: "📄", colorLight: "#6366F1", bgLight: "#EEF2FF", colorDark: "#818CF8", bgDark: "#1E1B4B", label: { fr: "Résumés",       en: "Summaries",     ar: "ملخصات"      } },
+  flashcard:   { icon: "🃏", colorLight: "#3B82F6", bgLight: "#EFF6FF", colorDark: "#60A5FA", bgDark: "#1E3A5F", label: { fr: "Flashcards",    en: "Flashcards",    ar: "بطاقات"      } },
+  plan:        { icon: "📅", colorLight: "#14B8A6", bgLight: "#F0FDFA", colorDark: "#2DD4BF", bgDark: "#022C26", label: { fr: "Plans d'étude", en: "Study Plans",   ar: "خطط الدراسة" } },
+  explanation: { icon: "💡", colorLight: "#F59E0B", bgLight: "#FFFBEB", colorDark: "#FCD34D", bgDark: "#2D1B00", label: { fr: "Explications",  en: "Explanations",  ar: "شروحات"      } },
+  solution:    { icon: "✏️", colorLight: "#10B981", bgLight: "#F0FDF4", colorDark: "#34D399", bgDark: "#022C22", label: { fr: "Solutions",     en: "Solutions",     ar: "حلول"        } },
+  chat:        { icon: "💬", colorLight: "#8B5CF6", bgLight: "#F5F3FF", colorDark: "#A78BFA", bgDark: "#1E1245", label: { fr: "Chat IA",       en: "AI Chat",       ar: "محادثات"     } },
 };
 
 const COLLECTIONS = [
@@ -45,6 +47,8 @@ const COLLECTIONS = [
 
 export default function SearchScreen() {
   const { currentLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
   const db = getFirestore(getApp());
   const auth = getAuth(getApp());
@@ -110,7 +114,6 @@ export default function SearchScreen() {
               const data = doc.data();
 
               if (col.type === "chat") {
-                // Cherche dans le courseName ET dans les messages
                 const courseName = (data.courseName || "").toLowerCase();
                 const messages = data.messages || [];
                 const courseMatch = courseName.includes(q);
@@ -180,27 +183,32 @@ export default function SearchScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
 
       {/* Header */}
       <View style={{
         flexDirection: isRTL ? "row-reverse" : "row",
         alignItems: "center", padding: 16,
-        backgroundColor: "#FFFFFF",
-        borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
+        backgroundColor: C.card,
+        borderBottomWidth: 1, borderBottomColor: C.border,
         gap: 12,
       }}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+          <Ionicons
+            name={isRTL ? "arrow-forward" : "arrow-back"}
+            size={24} color={C.text}
+          />
         </TouchableOpacity>
 
         <View style={{
           flex: 1, flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center",
-          backgroundColor: "#F3F4F6", borderRadius: 12,
-          paddingHorizontal: 12,
+          backgroundColor: isDark ? "#0F172A" : "#F3F4F6",
+          borderRadius: 12, paddingHorizontal: 12,
+          borderWidth: isDark ? 1 : 0,
+          borderColor: C.borderMedium,
         }}>
-          <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={18} color={C.textTertiary} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -209,18 +217,18 @@ export default function SearchScreen() {
               "Search history...",
               "بحث في السجل..."
             )}
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={C.textTertiary}
             autoFocus
             textAlign={isRTL ? "right" : "left"}
             style={{
               flex: 1, padding: 10, fontSize: 15,
-              color: "#111827",
+              color: C.text,
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={18} color={C.textTertiary} />
             </TouchableOpacity>
           )}
         </View>
@@ -231,8 +239,8 @@ export default function SearchScreen() {
         {/* Loading */}
         {loading && (
           <View style={{ alignItems: "center", marginTop: 40 }}>
-            <ActivityIndicator size="large" color="#6366F1" />
-            <Text style={{ fontSize: 13, color: "#9CA3AF", marginTop: 12 }}>
+            <ActivityIndicator size="large" color={C.primary} />
+            <Text style={{ fontSize: 13, color: C.textTertiary, marginTop: 12 }}>
               {getLabel("Recherche en cours...", "Searching...", "جارٍ البحث...")}
             </Text>
           </View>
@@ -242,10 +250,10 @@ export default function SearchScreen() {
         {!loading && searched && results.length === 0 && (
           <View style={{ alignItems: "center", marginTop: 60 }}>
             <Text style={{ fontSize: 40, marginBottom: 16 }}>🔍</Text>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 8 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: C.text, marginBottom: 8 }}>
               {getLabel("Aucun résultat", "No results", "لا توجد نتائج")}
             </Text>
-            <Text style={{ fontSize: 13, color: "#9CA3AF", textAlign: "center" }}>
+            <Text style={{ fontSize: 13, color: C.textTertiary, textAlign: "center" }}>
               {getLabel(
                 `Aucun résultat pour "${searchQuery}"`,
                 `No results for "${searchQuery}"`,
@@ -259,10 +267,10 @@ export default function SearchScreen() {
         {!loading && !searched && (
           <View style={{ alignItems: "center", marginTop: 60 }}>
             <Text style={{ fontSize: 40, marginBottom: 16 }}>🔎</Text>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 8 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: C.text, marginBottom: 8 }}>
               {getLabel("Recherche globale", "Global Search", "بحث شامل")}
             </Text>
-            <Text style={{ fontSize: 13, color: "#9CA3AF", textAlign: "center", lineHeight: 20 }}>
+            <Text style={{ fontSize: 13, color: C.textTertiary, textAlign: "center", lineHeight: 20 }}>
               {getLabel(
                 "Cherche dans tous tes quiz, résumés,\nflashcards, plans et plus encore.",
                 "Search across all your quizzes, summaries,\nflashcards, plans and more.",
@@ -270,22 +278,29 @@ export default function SearchScreen() {
               )}
             </Text>
 
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 24, justifyContent: "center" }}>
-              {Object.entries(TYPE_CONFIG).map(([type, config]) => (
-                <View
-                  key={type}
-                  style={{
-                    backgroundColor: config.bg, borderRadius: 20,
-                    paddingHorizontal: 12, paddingVertical: 6,
-                    flexDirection: "row", alignItems: "center", gap: 4,
-                  }}
-                >
-                  <Text style={{ fontSize: 14 }}>{config.icon}</Text>
-                  <Text style={{ fontSize: 12, color: config.color, fontWeight: "600" }}>
-                    {config.label[currentLanguage as keyof typeof config.label] || config.label.fr}
-                  </Text>
-                </View>
-              ))}
+            <View style={{
+              flexDirection: "row", flexWrap: "wrap", gap: 8,
+              marginTop: 24, justifyContent: "center",
+            }}>
+              {Object.entries(TYPE_CONFIG).map(([type, config]) => {
+                const color = isDark ? config.colorDark : config.colorLight;
+                const bg = isDark ? config.bgDark : config.bgLight;
+                return (
+                  <View
+                    key={type}
+                    style={{
+                      backgroundColor: bg, borderRadius: 20,
+                      paddingHorizontal: 12, paddingVertical: 6,
+                      flexDirection: "row", alignItems: "center", gap: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 14 }}>{config.icon}</Text>
+                    <Text style={{ fontSize: 12, color, fontWeight: "600" }}>
+                      {config.label[currentLanguage as keyof typeof config.label] || config.label.fr}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}
@@ -294,7 +309,7 @@ export default function SearchScreen() {
         {!loading && results.length > 0 && (
           <View>
             <Text style={{
-              fontSize: 13, color: "#9CA3AF", marginBottom: 16,
+              fontSize: 13, color: C.textTertiary, marginBottom: 16,
               textAlign: isRTL ? "right" : "left",
             }}>
               {results.length} {getLabel("résultat(s)", "result(s)", "نتيجة")}
@@ -302,6 +317,9 @@ export default function SearchScreen() {
 
             {Object.entries(grouped).map(([type, items]) => {
               const config = TYPE_CONFIG[type as keyof typeof TYPE_CONFIG];
+              const color = isDark ? config.colorDark : config.colorLight;
+              const bg = isDark ? config.bgDark : config.bgLight;
+
               return (
                 <View key={type} style={{ marginBottom: 20 }}>
                   {/* En-tête de groupe */}
@@ -310,14 +328,14 @@ export default function SearchScreen() {
                     alignItems: "center", gap: 8, marginBottom: 10,
                   }}>
                     <Text style={{ fontSize: 16 }}>{config.icon}</Text>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: config.color }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color }}>
                       {config.label[currentLanguage as keyof typeof config.label] || config.label.fr}
                     </Text>
                     <View style={{
-                      backgroundColor: config.bg, borderRadius: 10,
+                      backgroundColor: bg, borderRadius: 10,
                       paddingHorizontal: 8, paddingVertical: 2,
                     }}>
-                      <Text style={{ fontSize: 11, color: config.color, fontWeight: "600" }}>
+                      <Text style={{ fontSize: 11, color, fontWeight: "600" }}>
                         {items.length}
                       </Text>
                     </View>
@@ -325,8 +343,8 @@ export default function SearchScreen() {
 
                   {/* Items */}
                   <View style={{
-                    backgroundColor: "#FFFFFF", borderRadius: 14,
-                    borderWidth: 1, borderColor: "#F3F4F6", overflow: "hidden",
+                    backgroundColor: C.card, borderRadius: 14,
+                    borderWidth: 1, borderColor: C.border, overflow: "hidden",
                   }}>
                     {items.map((item, index) => (
                       <TouchableOpacity
@@ -336,12 +354,12 @@ export default function SearchScreen() {
                           flexDirection: isRTL ? "row-reverse" : "row",
                           alignItems: "center", padding: 14,
                           borderBottomWidth: index < items.length - 1 ? 1 : 0,
-                          borderBottomColor: "#F3F4F6",
+                          borderBottomColor: C.border,
                         }}
                       >
                         <View style={{
                           width: 36, height: 36, borderRadius: 10,
-                          backgroundColor: config.bg,
+                          backgroundColor: bg,
                           alignItems: "center", justifyContent: "center",
                           marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
                           flexShrink: 0,
@@ -352,7 +370,7 @@ export default function SearchScreen() {
                         <View style={{ flex: 1 }}>
                           <Text
                             style={{
-                              fontSize: 14, fontWeight: "600", color: "#111827",
+                              fontSize: 14, fontWeight: "600", color: C.text,
                               textAlign: isRTL ? "right" : "left",
                             }}
                             numberOfLines={2}
@@ -362,7 +380,7 @@ export default function SearchScreen() {
                           {item.subtitle ? (
                             <Text
                               style={{
-                                fontSize: 12, color: "#6B7280", marginTop: 3,
+                                fontSize: 12, color: C.textSecondary, marginTop: 3,
                                 textAlign: isRTL ? "right" : "left",
                               }}
                               numberOfLines={1}
@@ -371,7 +389,7 @@ export default function SearchScreen() {
                             </Text>
                           ) : null}
                           <Text style={{
-                            fontSize: 11, color: "#9CA3AF", marginTop: 2,
+                            fontSize: 11, color: C.textTertiary, marginTop: 2,
                             textAlign: isRTL ? "right" : "left",
                           }}>
                             {new Date(item.createdAt).toLocaleDateString(
@@ -383,7 +401,7 @@ export default function SearchScreen() {
 
                         <Ionicons
                           name={isRTL ? "chevron-back" : "chevron-forward"}
-                          size={16} color="#D1D5DB"
+                          size={16} color={C.borderMedium}
                         />
                       </TouchableOpacity>
                     ))}

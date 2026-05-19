@@ -7,19 +7,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLanguageStore, LANGUAGES, Language } from "../store/languageStore";
 import { useOnboardingStore } from "../store/onboardingStore";
+import { useThemeStore } from "../store/themeStore";
+import { Colors } from "../constants/colors";
 
 const { width } = Dimensions.get("window");
-
-const ONBOARDING_KEY = "studyai_onboarding_done";
 
 const getSlides = (lang: string) => [
   {
     icon: "school" as const,
     color: "#6366F1",
-    bg: "#EEF2FF",
+    bgLight: "#EEF2FF",
+    bgDark: "#1E1B4B",
     title: lang === "ar" ? "مرحباً بك في StudyAI" : lang === "en" ? "Welcome to StudyAI" : "Bienvenue sur StudyAI",
     subtitle: lang === "ar"
       ? "مساعدك الذكي للدراسة — يساعدك على التعلم أسرع وأذكى"
@@ -30,7 +30,8 @@ const getSlides = (lang: string) => [
   {
     icon: "sparkles" as const,
     color: "#8B5CF6",
-    bg: "#F5F3FF",
+    bgLight: "#F5F3FF",
+    bgDark: "#1E1245",
     title: lang === "ar" ? "أدوات دراسية ذكية" : lang === "en" ? "Smart Study Tools" : "Outils d'étude intelligents",
     subtitle: lang === "ar"
       ? "بطاقات تعليمية، اختبارات، ملخصات، خطط دراسية — كل ما تحتاجه في مكان واحد"
@@ -41,7 +42,8 @@ const getSlides = (lang: string) => [
   {
     icon: "trophy" as const,
     color: "#F59E0B",
-    bg: "#FFFBEB",
+    bgLight: "#FFFBEB",
+    bgDark: "#2D1B00",
     title: lang === "ar" ? "حقق أهدافك" : lang === "en" ? "Achieve Your Goals" : "Atteins tes objectifs",
     subtitle: lang === "ar"
       ? "سواء كانت امتحانات أو مشاريع أو تعلم جديد — StudyAI معك في كل خطوة"
@@ -53,6 +55,8 @@ const getSlides = (lang: string) => [
 
 export default function OnboardingScreen() {
   const { currentLanguage, setLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
   const slides = getSlides(currentLanguage);
 
@@ -90,21 +94,21 @@ export default function OnboardingScreen() {
   };
 
   const handleStart = async () => {
-  await setLanguage(selectedLang);
-  await completeOnboarding(); // met à jour Zustand + AsyncStorage
-  router.replace("/(auth)/login" as any);
-};
+    await setLanguage(selectedLang);
+    await completeOnboarding();
+    router.replace("/(auth)/login" as any);
+  };
 
-const handleSkip = async () => {
-  await completeOnboarding(); // met à jour Zustand + AsyncStorage
-  router.replace("/(auth)/login" as any);
-};
+  const handleSkip = async () => {
+    await completeOnboarding();
+    router.replace("/(auth)/login" as any);
+  };
 
   const currentSlide = slides[currentIndex];
   const isLast = currentIndex === slides.length - 1;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
 
       {/* Bouton Skip */}
       {!isLast && (
@@ -112,11 +116,13 @@ const handleSkip = async () => {
           onPress={handleSkip}
           style={{
             position: "absolute", top: 56, right: 24, zIndex: 10,
-            backgroundColor: "#F3F4F6", borderRadius: 20,
-            paddingHorizontal: 16, paddingVertical: 8,
+            backgroundColor: isDark ? C.card : "#F3F4F6",
+            borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: C.border,
           }}
         >
-          <Text style={{ fontSize: 13, color: "#6B7280", fontWeight: "600" }}>
+          <Text style={{ fontSize: 13, color: C.textSecondary, fontWeight: "600" }}>
             {currentLanguage === "ar" ? "تخطي" : currentLanguage === "en" ? "Skip" : "Passer"}
           </Text>
         </TouchableOpacity>
@@ -132,36 +138,44 @@ const handleSkip = async () => {
         scrollEventThrottle={16}
         style={{ flex: 1 }}
       >
-        {slides.map((slide, index) => (
-          <View
-            key={index}
-            style={{ width, flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}
-          >
-            {/* Icône */}
-            <View style={{
-              width: 120, height: 120, borderRadius: 32,
-              backgroundColor: slide.bg, alignItems: "center",
-              justifyContent: "center", marginBottom: 40,
-              borderWidth: 2, borderColor: slide.color + "30",
-            }}>
-              <Ionicons name={slide.icon} size={60} color={slide.color} />
-            </View>
+        {slides.map((slide, index) => {
+          const bg = isDark ? slide.bgDark : slide.bgLight;
+          return (
+            <View
+              key={index}
+              style={{
+                width, flex: 1, alignItems: "center",
+                justifyContent: "center", padding: 32,
+              }}
+            >
+              {/* Icône */}
+              <View style={{
+                width: 120, height: 120, borderRadius: 32,
+                backgroundColor: bg,
+                alignItems: "center", justifyContent: "center",
+                marginBottom: 40,
+                borderWidth: 2,
+                borderColor: slide.color + (isDark ? "50" : "30"),
+              }}>
+                <Ionicons name={slide.icon} size={60} color={slide.color} />
+              </View>
 
-            {/* Texte */}
-            <Text style={{
-              fontSize: 26, fontWeight: "800", color: "#111827",
-              textAlign: "center", marginBottom: 16, lineHeight: 34,
-            }}>
-              {slide.title}
-            </Text>
-            <Text style={{
-              fontSize: 15, color: "#6B7280", textAlign: "center",
-              lineHeight: 24, paddingHorizontal: 8,
-            }}>
-              {slide.subtitle}
-            </Text>
-          </View>
-        ))}
+              {/* Texte */}
+              <Text style={{
+                fontSize: 26, fontWeight: "800", color: C.text,
+                textAlign: "center", marginBottom: 16, lineHeight: 34,
+              }}>
+                {slide.title}
+              </Text>
+              <Text style={{
+                fontSize: 15, color: C.textSecondary,
+                textAlign: "center", lineHeight: 24, paddingHorizontal: 8,
+              }}>
+                {slide.subtitle}
+              </Text>
+            </View>
+          );
+        })}
       </ScrollView>
 
       {/* Bas de page */}
@@ -173,7 +187,8 @@ const handleSkip = async () => {
             <Animated.View
               key={i}
               style={{
-                height: 8, borderRadius: 4, backgroundColor: "#6366F1",
+                height: 8, borderRadius: 4,
+                backgroundColor: C.primary,
                 width: dotAnim[i].interpolate({
                   inputRange: [0, 1],
                   outputRange: [8, 24],
@@ -191,10 +206,12 @@ const handleSkip = async () => {
         {isLast && (
           <View style={{ marginBottom: 20 }}>
             <Text style={{
-              fontSize: 14, fontWeight: "600", color: "#374151",
+              fontSize: 14, fontWeight: "600", color: C.text,
               textAlign: "center", marginBottom: 12,
             }}>
-              {currentLanguage === "ar" ? "اختر لغتك" : currentLanguage === "en" ? "Choose your language" : "Choisis ta langue"}
+              {currentLanguage === "ar" ? "اختر لغتك"
+                : currentLanguage === "en" ? "Choose your language"
+                : "Choisis ta langue"}
             </Text>
             <View style={{ flexDirection: "row", gap: 10 }}>
               {LANGUAGES.map((lang) => (
@@ -203,15 +220,19 @@ const handleSkip = async () => {
                   onPress={() => setSelectedLang(lang.code)}
                   style={{
                     flex: 1, borderRadius: 12, padding: 12, alignItems: "center",
-                    backgroundColor: selectedLang === lang.code ? "#EEF2FF" : "#FFFFFF",
+                    backgroundColor: selectedLang === lang.code
+                      ? C.primaryLight
+                      : C.card,
                     borderWidth: 1.5,
-                    borderColor: selectedLang === lang.code ? "#6366F1" : "#E5E7EB",
+                    borderColor: selectedLang === lang.code
+                      ? C.primary
+                      : C.borderMedium,
                   }}
                 >
                   <Text style={{ fontSize: 22 }}>{lang.flag}</Text>
                   <Text style={{
                     fontSize: 12, fontWeight: "600", marginTop: 4,
-                    color: selectedLang === lang.code ? "#6366F1" : "#374151",
+                    color: selectedLang === lang.code ? C.primary : C.text,
                   }}>
                     {lang.nativeLabel}
                   </Text>
@@ -225,8 +246,8 @@ const handleSkip = async () => {
         <TouchableOpacity
           onPress={isLast ? handleStart : goToNext}
           style={{
-            backgroundColor: "#6366F1", borderRadius: 14,
-            padding: 16, alignItems: "center",
+            backgroundColor: C.primary,
+            borderRadius: 14, padding: 16, alignItems: "center",
             flexDirection: isRTL ? "row-reverse" : "row",
             justifyContent: "center", gap: 8, elevation: 4,
           }}
@@ -237,7 +258,9 @@ const handleSkip = async () => {
               : currentLanguage === "ar" ? "التالي" : currentLanguage === "en" ? "Next" : "Suivant"
             }
           </Text>
-          {!isLast && <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={18} color="#FFF" />}
+          {!isLast && (
+            <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={18} color="#FFF" />
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

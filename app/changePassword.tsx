@@ -9,14 +9,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useLanguageStore } from "@/store/languageStore";
+import { useThemeStore } from "@/store/themeStore";
+import { Colors } from "@/constants/colors";
 import {
-  getAuth, signInWithEmailAndPassword,
-  updatePassword, EmailAuthProvider, reauthenticateWithCredential,
+  getAuth, EmailAuthProvider, reauthenticateWithCredential, updatePassword,
 } from "firebase/auth";
 import app from "@/src/config/firebase";
 
 export default function ChangePasswordScreen() {
   const { currentLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
 
   const [oldPassword, setOldPassword] = useState("");
@@ -27,46 +30,33 @@ export default function ChangePasswordScreen() {
   const [loading, setLoading] = useState(false);
 
   const t = {
-    title:       currentLanguage === "ar" ? "تغيير كلمة المرور"        : currentLanguage === "en" ? "Change Password"           : "Modifier le mot de passe",
-    oldPassword: currentLanguage === "ar" ? "كلمة المرور الحالية"      : currentLanguage === "en" ? "Current password"          : "Mot de passe actuel",
-    newPassword: currentLanguage === "ar" ? "كلمة المرور الجديدة"      : currentLanguage === "en" ? "New password"              : "Nouveau mot de passe",
-    confirm:     currentLanguage === "ar" ? "تأكيد كلمة المرور الجديدة": currentLanguage === "en" ? "Confirm new password"      : "Confirmer le nouveau mot de passe",
-    saveBtn:     currentLanguage === "ar" ? "تغيير كلمة المرور"        : currentLanguage === "en" ? "Change password"           : "Modifier le mot de passe",
-    success:     currentLanguage === "ar" ? "تم تغيير كلمة المرور بنجاح!" : currentLanguage === "en" ? "Password changed successfully!" : "Mot de passe modifié avec succès !",
-    errEmpty:    currentLanguage === "ar" ? "يرجى ملء جميع الحقول."   : currentLanguage === "en" ? "Please fill all fields."   : "Veuillez remplir tous les champs.",
-    errMatch:    currentLanguage === "ar" ? "كلمتا المرور غير متطابقتين." : currentLanguage === "en" ? "Passwords do not match." : "Les mots de passe ne correspondent pas.",
-    errMin:      currentLanguage === "ar" ? "6 أحرف على الأقل."        : currentLanguage === "en" ? "Minimum 6 characters."    : "Minimum 6 caractères.",
+    title:       currentLanguage === "ar" ? "تغيير كلمة المرور"            : currentLanguage === "en" ? "Change Password"              : "Modifier le mot de passe",
+    oldPassword: currentLanguage === "ar" ? "كلمة المرور الحالية"          : currentLanguage === "en" ? "Current password"             : "Mot de passe actuel",
+    newPassword: currentLanguage === "ar" ? "كلمة المرور الجديدة"          : currentLanguage === "en" ? "New password"                 : "Nouveau mot de passe",
+    confirm:     currentLanguage === "ar" ? "تأكيد كلمة المرور الجديدة"    : currentLanguage === "en" ? "Confirm new password"         : "Confirmer le nouveau mot de passe",
+    saveBtn:     currentLanguage === "ar" ? "تغيير كلمة المرور"            : currentLanguage === "en" ? "Change password"              : "Modifier le mot de passe",
+    success:     currentLanguage === "ar" ? "تم تغيير كلمة المرور بنجاح!"  : currentLanguage === "en" ? "Password changed successfully!" : "Mot de passe modifié avec succès !",
+    errEmpty:    currentLanguage === "ar" ? "يرجى ملء جميع الحقول."        : currentLanguage === "en" ? "Please fill all fields."      : "Veuillez remplir tous les champs.",
+    errMatch:    currentLanguage === "ar" ? "كلمتا المرور غير متطابقتين."  : currentLanguage === "en" ? "Passwords do not match."      : "Les mots de passe ne correspondent pas.",
+    errMin:      currentLanguage === "ar" ? "6 أحرف على الأقل."            : currentLanguage === "en" ? "Minimum 6 characters."        : "Minimum 6 caractères.",
     errWrong:    currentLanguage === "ar" ? "كلمة المرور الحالية غير صحيحة." : currentLanguage === "en" ? "Current password is incorrect." : "Mot de passe actuel incorrect.",
-    errFail:     currentLanguage === "ar" ? "فشل تغيير كلمة المرور."   : currentLanguage === "en" ? "Failed to change password." : "Échec de la modification.",
+    errFail:     currentLanguage === "ar" ? "فشل تغيير كلمة المرور."       : currentLanguage === "en" ? "Failed to change password."   : "Échec de la modification.",
   };
 
   const handleChangePassword = async () => {
-    if (!oldPassword.trim() || !newPassword.trim() || !confirm.trim()) {
-      Alert.alert("", t.errEmpty); return;
-    }
-    if (newPassword !== confirm) {
-      Alert.alert("", t.errMatch); return;
-    }
-    if (newPassword.length < 6) {
-      Alert.alert("", t.errMin); return;
-    }
+    if (!oldPassword.trim() || !newPassword.trim() || !confirm.trim()) { Alert.alert("", t.errEmpty); return; }
+    if (newPassword !== confirm) { Alert.alert("", t.errMatch); return; }
+    if (newPassword.length < 6) { Alert.alert("", t.errMin); return; }
 
     setLoading(true);
     try {
       const auth = getAuth(app);
       const user = auth.currentUser;
       if (!user || !user.email) throw new Error(t.errFail);
-
-      // Ré-authentifier avec l'ancien mot de passe
       const credential = EmailAuthProvider.credential(user.email, oldPassword);
       await reauthenticateWithCredential(user, credential);
-
-      // Mettre à jour le mot de passe
       await updatePassword(user, newPassword);
-
-      Alert.alert("✅", t.success, [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      Alert.alert("✅", t.success, [{ text: "OK", onPress: () => router.back() }]);
     } catch (e: any) {
       if (e.code === "auth/wrong-password" || e.code === "auth/invalid-credential") {
         Alert.alert("", t.errWrong);
@@ -78,8 +68,22 @@ export default function ChangePasswordScreen() {
     }
   };
 
+  // Style réutilisable
+  const inputStyle = {
+    backgroundColor: C.card,
+    borderWidth: 1, borderColor: C.borderMedium,
+    borderRadius: 12, padding: 14, paddingRight: 48,
+    fontSize: 15, color: C.text,
+  };
+
+  const labelStyle = {
+    fontSize: 14, fontWeight: "600" as const,
+    color: C.text, marginBottom: 8,
+    textAlign: isRTL ? "right" as const : "left" as const,
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -94,95 +98,88 @@ export default function ChangePasswordScreen() {
             alignItems: "center", marginBottom: 32, gap: 12,
           }}>
             <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+              <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={C.text} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 20, fontWeight: "700", color: "#111827" }}>
+            <Text style={{ fontSize: 20, fontWeight: "700", color: C.text }}>
               {t.title}
             </Text>
           </View>
 
           {/* Ancien mot de passe */}
-          <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-            {t.oldPassword}
-          </Text>
+          <Text style={labelStyle}>{t.oldPassword}</Text>
           <View style={{ position: "relative", marginBottom: 20 }}>
             <TextInput
               value={oldPassword}
               onChangeText={setOldPassword}
               placeholder="••••••••"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={C.textTertiary}
               secureTextEntry={!showOld}
               textAlign={isRTL ? "right" : "left"}
-              style={{
-                backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-                borderRadius: 12, padding: 14, paddingRight: 48,
-                fontSize: 15, color: "#111827",
-              }}
+              style={inputStyle}
             />
             <TouchableOpacity
               onPress={() => setShowOld(!showOld)}
               style={{ position: "absolute", right: 14, top: 14 }}
             >
-              <Ionicons name={showOld ? "eye-off-outline" : "eye-outline"} size={22} color="#9CA3AF" />
+              <Ionicons name={showOld ? "eye-off-outline" : "eye-outline"} size={22} color={C.textTertiary} />
             </TouchableOpacity>
           </View>
 
           {/* Nouveau mot de passe */}
-          <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-            {t.newPassword}
-          </Text>
+          <Text style={labelStyle}>{t.newPassword}</Text>
           <View style={{ position: "relative", marginBottom: 20 }}>
             <TextInput
               value={newPassword}
               onChangeText={setNewPassword}
               placeholder="••••••••"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={C.textTertiary}
               secureTextEntry={!showNew}
               textAlign={isRTL ? "right" : "left"}
-              style={{
-                backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-                borderRadius: 12, padding: 14, paddingRight: 48,
-                fontSize: 15, color: "#111827",
-              }}
+              style={inputStyle}
             />
             <TouchableOpacity
               onPress={() => setShowNew(!showNew)}
               style={{ position: "absolute", right: 14, top: 14 }}
             >
-              <Ionicons name={showNew ? "eye-off-outline" : "eye-outline"} size={22} color="#9CA3AF" />
+              <Ionicons name={showNew ? "eye-off-outline" : "eye-outline"} size={22} color={C.textTertiary} />
             </TouchableOpacity>
           </View>
 
           {/* Confirmer */}
-          <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-            {t.confirm}
-          </Text>
+          <Text style={labelStyle}>{t.confirm}</Text>
           <TextInput
             value={confirm}
             onChangeText={setConfirm}
             placeholder="••••••••"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={C.textTertiary}
             secureTextEntry
             textAlign={isRTL ? "right" : "left"}
             style={{
-              backgroundColor: "#FFFFFF", borderWidth: 1,
-              borderColor: confirm.length > 0 && confirm !== newPassword ? "#EF4444" : "#E5E7EB",
-              borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
+              backgroundColor: C.card,
+              borderWidth: 1,
+              borderColor: confirm.length > 0 && confirm !== newPassword ? C.danger : C.borderMedium,
+              borderRadius: 12, padding: 14,
+              fontSize: 15, color: C.text,
               marginBottom: confirm.length > 0 && confirm !== newPassword ? 4 : 32,
             }}
           />
           {confirm.length > 0 && confirm !== newPassword && (
-            <Text style={{ fontSize: 12, color: "#EF4444", marginBottom: 28, textAlign: isRTL ? "right" : "left" }}>
+            <Text style={{
+              fontSize: 12, color: C.danger,
+              marginBottom: 28, textAlign: isRTL ? "right" : "left",
+            }}>
               {t.errMatch}
             </Text>
           )}
 
+          {/* Bouton */}
           <TouchableOpacity
             onPress={handleChangePassword}
             disabled={loading}
             style={{
-              backgroundColor: loading ? "#A5B4FC" : "#6366F1",
-              borderRadius: 14, padding: 16, alignItems: "center", elevation: 4,
+              backgroundColor: loading ? (isDark ? "#3730A3" : "#A5B4FC") : C.primary,
+              borderRadius: 14, padding: 16,
+              alignItems: "center", elevation: 4,
             }}
           >
             {loading ? (

@@ -1,21 +1,24 @@
 // app/about.tsx
 import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, Linking, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useLanguageStore } from "../store/languageStore";
+import { useThemeStore } from "../store/themeStore";
+import { Colors } from "../constants/colors";
 import Constants from "expo-constants";
 
 const AIModelBadge = ({
-  getLabel,
+  getLabel, C,
 }: {
   isRTL: boolean;
   getLabel: (fr: string, en: string, ar: string) => string;
+  C: typeof Colors.light;
 }) => {
   const aiModel = Constants.expoConfig?.extra?.aiModel || "gpt-4o-mini";
   return (
-    <Text style={{ fontSize: 13, color: "#6366F1", fontWeight: "600" }}>
+    <Text style={{ fontSize: 13, color: C.primary, fontWeight: "600" }}>
       {getLabel("Propulsé par", "Powered by", "مدعوم بـ")} {aiModel}
     </Text>
   );
@@ -23,6 +26,8 @@ const AIModelBadge = ({
 
 export default function AboutScreen() {
   const { currentLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
 
   const getLabel = (fr: string, en: string, ar: string) =>
@@ -106,7 +111,7 @@ export default function AboutScreen() {
   ];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
         {/* Header */}
@@ -118,9 +123,9 @@ export default function AboutScreen() {
             onPress={() => router.back()}
             style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
           >
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={C.text} />
           </TouchableOpacity>
-          <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
+          <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>
             {getLabel("À propos", "About", "حول التطبيق")}
           </Text>
         </View>
@@ -129,36 +134,33 @@ export default function AboutScreen() {
         <View style={{ alignItems: "center", marginBottom: 32 }}>
           <View style={{
             width: 90, height: 90, borderRadius: 24,
-            backgroundColor: "#6366F1", alignItems: "center",
+            backgroundColor: C.primary, alignItems: "center",
             justifyContent: "center", marginBottom: 16,
           }}>
             <Ionicons name="school" size={48} color="#FFFFFF" />
           </View>
-
-          <Text style={{ fontSize: 26, fontWeight: "800", color: "#111827" }}>
+          <Text style={{ fontSize: 26, fontWeight: "800", color: C.text }}>
             StudyAI
           </Text>
-
-          <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>
+          <Text style={{ fontSize: 13, color: C.textSecondary, marginTop: 4 }}>
             {getLabel("Version", "Version", "الإصدار")} {version}
           </Text>
-
           <View style={{
-            backgroundColor: "#EEF2FF", borderRadius: 20,
+            backgroundColor: C.primaryLight, borderRadius: 20,
             paddingHorizontal: 16, paddingVertical: 6, marginTop: 10,
           }}>
-            <AIModelBadge isRTL={isRTL} getLabel={getLabel} />
+            <AIModelBadge isRTL={isRTL} getLabel={getLabel} C={C} />
           </View>
         </View>
 
         {/* Description */}
         <View style={{
-          backgroundColor: "#FFFFFF", borderRadius: 14,
+          backgroundColor: C.card, borderRadius: 14,
           padding: 16, marginBottom: 20,
-          borderWidth: 1, borderColor: "#F3F4F6",
+          borderWidth: 1, borderColor: C.border,
         }}>
           <Text style={{
-            fontSize: 14, color: "#374151", lineHeight: 22,
+            fontSize: 14, color: C.text, lineHeight: 22,
             textAlign: isRTL ? "right" : "left",
           }}>
             {getLabel(
@@ -171,15 +173,15 @@ export default function AboutScreen() {
 
         {/* Fonctionnalités */}
         <Text style={{
-          fontSize: 15, fontWeight: "700", color: "#111827",
+          fontSize: 15, fontWeight: "700", color: C.text,
           marginBottom: 12, textAlign: isRTL ? "right" : "left",
         }}>
           ✨ {getLabel("Fonctionnalités", "Features", "المميزات")}
         </Text>
 
         <View style={{
-          backgroundColor: "#FFFFFF", borderRadius: 14,
-          borderWidth: 1, borderColor: "#F3F4F6",
+          backgroundColor: C.card, borderRadius: 14,
+          borderWidth: 1, borderColor: C.border,
           marginBottom: 20, overflow: "hidden",
         }}>
           {features.map((feature, index) => (
@@ -189,26 +191,26 @@ export default function AboutScreen() {
                 flexDirection: isRTL ? "row-reverse" : "row",
                 alignItems: "flex-start", padding: 14,
                 borderBottomWidth: index < features.length - 1 ? 1 : 0,
-                borderBottomColor: "#F3F4F6",
+                borderBottomColor: C.border,
               }}
             >
               <View style={{
                 width: 36, height: 36, borderRadius: 10,
-                backgroundColor: "#EEF2FF", alignItems: "center",
-                justifyContent: "center", flexShrink: 0,
+                backgroundColor: C.primaryLight,
+                alignItems: "center", justifyContent: "center", flexShrink: 0,
                 marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
               }}>
-                <Ionicons name={feature.icon as any} size={18} color="#6366F1" />
+                <Ionicons name={feature.icon as any} size={18} color={C.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{
-                  fontSize: 14, fontWeight: "600", color: "#111827",
+                  fontSize: 14, fontWeight: "600", color: C.text,
                   textAlign: isRTL ? "right" : "left", marginBottom: 2,
                 }}>
                   {feature.title}
                 </Text>
                 <Text style={{
-                  fontSize: 12, color: "#6B7280", lineHeight: 18,
+                  fontSize: 12, color: C.textSecondary, lineHeight: 18,
                   textAlign: isRTL ? "right" : "left",
                 }}>
                   {feature.desc}
@@ -220,15 +222,15 @@ export default function AboutScreen() {
 
         {/* Liens */}
         <Text style={{
-          fontSize: 15, fontWeight: "700", color: "#111827",
+          fontSize: 15, fontWeight: "700", color: C.text,
           marginBottom: 12, textAlign: isRTL ? "right" : "left",
         }}>
           🔗 {getLabel("Liens utiles", "Useful links", "روابط مفيدة")}
         </Text>
 
         <View style={{
-          backgroundColor: "#FFFFFF", borderRadius: 14,
-          borderWidth: 1, borderColor: "#F3F4F6",
+          backgroundColor: C.card, borderRadius: 14,
+          borderWidth: 1, borderColor: C.border,
           marginBottom: 20, overflow: "hidden",
         }}>
           {links.map((link, index) => (
@@ -239,26 +241,26 @@ export default function AboutScreen() {
                 flexDirection: isRTL ? "row-reverse" : "row",
                 alignItems: "center", padding: 16,
                 borderBottomWidth: index < links.length - 1 ? 1 : 0,
-                borderBottomColor: "#F3F4F6",
+                borderBottomColor: C.border,
               }}
             >
               <View style={{
                 width: 36, height: 36, borderRadius: 10,
-                backgroundColor: "#EEF2FF", alignItems: "center",
-                justifyContent: "center",
+                backgroundColor: C.primaryLight,
+                alignItems: "center", justifyContent: "center",
                 marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
               }}>
-                <Ionicons name={link.icon as any} size={18} color="#6366F1" />
+                <Ionicons name={link.icon as any} size={18} color={C.primary} />
               </View>
               <Text style={{
-                flex: 1, fontSize: 14, color: "#374151",
+                flex: 1, fontSize: 14, color: C.text,
                 fontWeight: "500", textAlign: isRTL ? "right" : "left",
               }}>
                 {link.label}
               </Text>
               <Ionicons
                 name={isRTL ? "chevron-back" : "chevron-forward"}
-                size={16} color="#D1D5DB"
+                size={16} color={C.borderMedium}
               />
             </TouchableOpacity>
           ))}
@@ -266,14 +268,14 @@ export default function AboutScreen() {
 
         {/* Footer */}
         <View style={{ alignItems: "center", marginTop: 8 }}>
-          <Text style={{ fontSize: 12, color: "#9CA3AF" }}>
+          <Text style={{ fontSize: 12, color: C.textSecondary }}>
             {getLabel(
               "Fait avec ❤️ par MindForge Studio",
               "Made with ❤️ by MindForge Studio",
               "صُنع بـ ❤️ من MindForge Studio"
             )}
           </Text>
-          <Text style={{ fontSize: 11, color: "#D1D5DB", marginTop: 4 }}>
+          <Text style={{ fontSize: 11, color: C.textTertiary, marginTop: 4 }}>
             © 2025 StudyAI. {getLabel("Tous droits réservés.", "All rights reserved.", "جميع الحقوق محفوظة.")}
           </Text>
         </View>

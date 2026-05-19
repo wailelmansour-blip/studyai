@@ -13,6 +13,8 @@ import { useAuthStore } from "@/store/authStore";
 import { useLanguageStore, LANGUAGES, Language } from "@/store/languageStore";
 import { GoogleSignInButton } from "../../components/GoogleSignInButton";
 import { configureGoogleSignIn, signInWithGoogle } from "../../services/googleAuth";
+import { useThemeStore } from "../../store/themeStore";
+import { Colors } from "../../constants/colors";
 
 const getPasswordStrength = (pwd: string, lang: string): { label: string; color: string; score: number } => {
   let score = 0;
@@ -35,6 +37,8 @@ const getPasswordStrength = (pwd: string, lang: string): { label: string; color:
 export default function SignupScreen() {
   const { signup, isLoading, error, clearError, lastCreatedUid } = useAuthStore();
   const { currentLanguage, setLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
 
   const [firstName, setFirstName] = useState("");
@@ -48,8 +52,6 @@ export default function SignupScreen() {
   const [showLangModal, setShowLangModal] = useState(false);
   const [changingLang, setChangingLang] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-
-  // ── Parental consent ──
   const [showParentSection, setShowParentSection] = useState(false);
   const [parentEmail, setParentEmail] = useState("");
   const [sendingConsent, setSendingConsent] = useState(false);
@@ -95,18 +97,13 @@ export default function SignupScreen() {
     or:               currentLanguage === "ar" ? "أو"                                      : currentLanguage === "en" ? "or"                              : "ou",
   };
 
-  useEffect(() => {
-    configureGoogleSignIn();
-  }, []);
+  useEffect(() => { configureGoogleSignIn(); }, []);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
       const result = await signInWithGoogle();
-      if (result.status === "error") {
-        Alert.alert("", t.googleError);
-      }
-      // Si success → _layout.tsx gère la navigation automatiquement
+      if (result.status === "error") Alert.alert("", t.googleError);
     } finally {
       setGoogleLoading(false);
     }
@@ -135,44 +132,21 @@ export default function SignupScreen() {
     if (!email.trim() || !password.trim()) { Alert.alert("", t.errEmail); return; }
     if (password !== confirm) { Alert.alert("", t.passwordMismatch); return; }
     if (password.length < 6) { Alert.alert("", t.errMin); return; }
-
     clearError();
     try {
-      await signup(
-        email.trim(), password,
-        firstName.trim(), lastName.trim(),
-        birthDate.toISOString().split("T")[0],
-        currentLanguage
-      );
-
+      await signup(email.trim(), password, firstName.trim(), lastName.trim(), birthDate.toISOString().split("T")[0], currentLanguage);
       const age = getAge(birthDate);
-      if (age < 13) {
-        setShowParentSection(true);
-        return;
-      }
-
-      router.replace({
-        pathname: "/(auth)/login",
-        params: { email: email.trim(), justRegistered: "true" },
-      });
+      if (age < 13) { setShowParentSection(true); return; }
+      router.replace({ pathname: "/(auth)/login", params: { email: email.trim(), justRegistered: "true" } });
     } catch (e: any) {
-      if (e.code === "auth/email-already-in-use") {
-        Alert.alert("", t.errDuplicate);
-      } else {
-        Alert.alert("", error || e.message || t.errFail);
-      }
+      if (e.code === "auth/email-already-in-use") Alert.alert("", t.errDuplicate);
+      else Alert.alert("", error || e.message || t.errFail);
     }
   };
 
   const handleSendParentalConsent = async () => {
-    if (!parentEmail.trim() || !parentEmail.includes("@")) {
-      Alert.alert("", t.errParentEmail);
-      return;
-    }
-    if (!lastCreatedUid) {
-      Alert.alert("", t.errConsentFail);
-      return;
-    }
+    if (!parentEmail.trim() || !parentEmail.includes("@")) { Alert.alert("", t.errParentEmail); return; }
+    if (!lastCreatedUid) { Alert.alert("", t.errConsentFail); return; }
     setSendingConsent(true);
     try {
       const response = await fetch(
@@ -180,12 +154,7 @@ export default function SignupScreen() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            parentEmail: parentEmail.trim(),
-            childName: `${firstName} ${lastName}`,
-            language: currentLanguage,
-            uid: lastCreatedUid,
-          }),
+          body: JSON.stringify({ parentEmail: parentEmail.trim(), childName: `${firstName} ${lastName}`, language: currentLanguage, uid: lastCreatedUid }),
         }
       );
       const data = await response.json();
@@ -198,8 +167,22 @@ export default function SignupScreen() {
     }
   };
 
+  // Style réutilisable pour les inputs
+  const inputStyle = {
+    backgroundColor: C.card,
+    borderWidth: 1, borderColor: C.borderMedium,
+    borderRadius: 12, padding: 14,
+    fontSize: 15, color: C.text, marginBottom: 16,
+  };
+
+  const labelStyle = {
+    fontSize: 14, fontWeight: "600" as const,
+    color: C.text, marginBottom: 8,
+    textAlign: isRTL ? "right" as const : "left" as const,
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -208,99 +191,93 @@ export default function SignupScreen() {
           contentContainerStyle={{ flexGrow: 1, padding: 24, paddingTop: 40, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header : retour + sélecteur langue */}
+          {/* Header */}
           <View style={{
             flexDirection: isRTL ? "row-reverse" : "row",
             alignItems: "center", justifyContent: "space-between", marginBottom: 24,
           }}>
             <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+              <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={C.text} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setShowLangModal(true)}
               style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
             >
               <Text style={{ fontSize: 20 }}>{currentLang?.flag}</Text>
-              <Text style={{ fontSize: 13, color: "#6B7280", fontWeight: "500" }}>
+              <Text style={{ fontSize: 13, color: C.textSecondary, fontWeight: "500" }}>
                 {currentLang?.nativeLabel}
               </Text>
-              <Ionicons name="chevron-down" size={14} color="#6B7280" />
+              <Ionicons name="chevron-down" size={14} color={C.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <View style={{ marginBottom: 32 }}>
-            <Text style={{ fontSize: 28, fontWeight: "700", color: "#111827", textAlign: isRTL ? "right" : "left" }}>
+            <Text style={{ fontSize: 28, fontWeight: "700", color: C.text, textAlign: isRTL ? "right" : "left" }}>
               {t.title}
             </Text>
-            <Text style={{ fontSize: 15, color: "#6B7280", marginTop: 6, textAlign: isRTL ? "right" : "left" }}>
+            <Text style={{ fontSize: 15, color: C.textSecondary, marginTop: 6, textAlign: isRTL ? "right" : "left" }}>
               {t.subtitle}
             </Text>
           </View>
 
-          {/* Bouton Google EN HAUT */}
-<GoogleSignInButton
-  onPress={handleGoogleSignIn}
-  isLoading={googleLoading}
-  label={t.googleBtn}
-/>
+          {/* Google */}
+          <GoogleSignInButton onPress={handleGoogleSignIn} isLoading={googleLoading} label={t.googleBtn} />
 
-{/* Séparateur */}
-<View style={{ flexDirection: "row", alignItems: "center", marginVertical: 20, gap: 10 }}>
-  <View style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
-  <Text style={{ fontSize: 13, color: "#9CA3AF" }}>{t.or}</Text>
-  <View style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
-</View>
+          {/* Séparateur */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 20, gap: 10 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: C.borderMedium }} />
+            <Text style={{ fontSize: 13, color: C.textTertiary }}>{t.or}</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: C.borderMedium }} />
+          </View>
 
-          {/* ── Section Consentement Parental ── */}
+          {/* Section Consentement Parental */}
           {showParentSection ? (
             <View style={{
-              backgroundColor: "#FFFBEB", borderRadius: 14, padding: 20,
-              borderWidth: 1, borderColor: "#FCD34D",
+              backgroundColor: isDark ? "#2D1B00" : "#FFFBEB",
+              borderRadius: 14, padding: 20,
+              borderWidth: 1, borderColor: isDark ? "#92400E" : "#FCD34D",
             }}>
-              <Text style={{ fontSize: 16, fontWeight: "700", color: "#92400E", marginBottom: 10, textAlign: isRTL ? "right" : "left" }}>
+              <Text style={{
+                fontSize: 16, fontWeight: "700",
+                color: isDark ? "#FCD34D" : "#92400E",
+                marginBottom: 10, textAlign: isRTL ? "right" : "left",
+              }}>
                 {t.parentTitle}
               </Text>
-              <Text style={{ fontSize: 14, color: "#92400E", lineHeight: 22, marginBottom: 20, textAlign: isRTL ? "right" : "left" }}>
+              <Text style={{
+                fontSize: 14, color: isDark ? "#FCD34D" : "#92400E",
+                lineHeight: 22, marginBottom: 20, textAlign: isRTL ? "right" : "left",
+              }}>
                 {t.parentDesc}
               </Text>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-                {t.parentEmailLabel}
-              </Text>
+              <Text style={labelStyle}>{t.parentEmailLabel}</Text>
               <TextInput
-                value={parentEmail}
-                onChangeText={setParentEmail}
-                placeholder={t.parentEmailPH}
-                placeholderTextColor="#9CA3AF"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                editable={!consentSent}
-                textAlign={isRTL ? "right" : "left"}
-                style={{
-                  backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-                  borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
-                  marginBottom: 16, opacity: consentSent ? 0.6 : 1,
-                }}
+                value={parentEmail} onChangeText={setParentEmail}
+                placeholder={t.parentEmailPH} placeholderTextColor={C.textTertiary}
+                keyboardType="email-address" autoCapitalize="none"
+                editable={!consentSent} textAlign={isRTL ? "right" : "left"}
+                style={{ ...inputStyle, marginBottom: 16, opacity: consentSent ? 0.6 : 1 }}
               />
               {consentSent ? (
                 <View>
                   <View style={{
-                    backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14,
-                    borderWidth: 1, borderColor: "#BBF7D0", marginBottom: 16,
+                    backgroundColor: isDark ? "#022C22" : "#F0FDF4",
+                    borderRadius: 12, padding: 14,
+                    borderWidth: 1, borderColor: isDark ? "#065F46" : "#BBF7D0",
+                    marginBottom: 16,
                   }}>
-                    <Text style={{ color: "#065F46", fontSize: 14, textAlign: "center", lineHeight: 20 }}>
+                    <Text style={{
+                      color: isDark ? "#34D399" : "#065F46",
+                      fontSize: 14, textAlign: "center", lineHeight: 20,
+                    }}>
                       {t.consentSentMsg}
                     </Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => router.replace({
-                      pathname: "/(auth)/login",
-                      params: { email: email.trim(), justRegistered: "true" },
-                    })}
-                    style={{ backgroundColor: "#6366F1", borderRadius: 14, padding: 16, alignItems: "center" }}
+                    onPress={() => router.replace({ pathname: "/(auth)/login", params: { email: email.trim(), justRegistered: "true" } })}
+                    style={{ backgroundColor: C.primary, borderRadius: 14, padding: 16, alignItems: "center" }}
                   >
-                    <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>
-                      {t.continueBtn}
-                    </Text>
+                    <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 16 }}>{t.continueBtn}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -308,16 +285,16 @@ export default function SignupScreen() {
                   onPress={handleSendParentalConsent}
                   disabled={sendingConsent || !parentEmail.trim()}
                   style={{
-                    backgroundColor: sendingConsent || !parentEmail.trim() ? "#A5B4FC" : "#6366F1",
+                    backgroundColor: sendingConsent || !parentEmail.trim()
+                      ? (isDark ? "#3730A3" : "#A5B4FC")
+                      : C.primary,
                     borderRadius: 14, padding: 16, alignItems: "center",
                   }}
                 >
                   {sendingConsent ? (
                     <ActivityIndicator color="#FFF" size="small" />
                   ) : (
-                    <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 15 }}>
-                      {t.sendConsent}
-                    </Text>
+                    <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 15 }}>{t.sendConsent}</Text>
                   )}
                 </TouchableOpacity>
               )}
@@ -326,48 +303,37 @@ export default function SignupScreen() {
           ) : (
             <View>
               {/* Prénom */}
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-                {t.firstName}
-              </Text>
+              <Text style={labelStyle}>{t.firstName}</Text>
               <TextInput
                 value={firstName} onChangeText={setFirstName}
-                placeholder={t.firstNamePH} placeholderTextColor="#9CA3AF"
+                placeholder={t.firstNamePH} placeholderTextColor={C.textTertiary}
                 autoCapitalize="words" textAlign={isRTL ? "right" : "left"}
-                style={{
-                  backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-                  borderRadius: 12, padding: 14, fontSize: 15, color: "#111827", marginBottom: 16,
-                }}
+                style={inputStyle}
               />
 
               {/* Nom */}
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-                {t.lastName}
-              </Text>
+              <Text style={labelStyle}>{t.lastName}</Text>
               <TextInput
                 value={lastName} onChangeText={setLastName}
-                placeholder={t.lastNamePH} placeholderTextColor="#9CA3AF"
+                placeholder={t.lastNamePH} placeholderTextColor={C.textTertiary}
                 autoCapitalize="words" textAlign={isRTL ? "right" : "left"}
-                style={{
-                  backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-                  borderRadius: 12, padding: 14, fontSize: 15, color: "#111827", marginBottom: 16,
-                }}
+                style={inputStyle}
               />
 
               {/* Date de naissance */}
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-                {t.birthDate}
-              </Text>
+              <Text style={labelStyle}>{t.birthDate}</Text>
               <TouchableOpacity
                 onPress={() => setShowDatePicker(true)}
                 style={{
-                  backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
+                  backgroundColor: C.card,
+                  borderWidth: 1, borderColor: C.borderMedium,
                   borderRadius: 12, padding: 14, marginBottom: 16,
                   flexDirection: isRTL ? "row-reverse" : "row",
                   alignItems: "center", justifyContent: "space-between",
                 }}
               >
-                <Text style={{ fontSize: 15, color: "#111827" }}>{formatDate(birthDate)}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
+                <Text style={{ fontSize: 15, color: C.text }}>{formatDate(birthDate)}</Text>
+                <Ionicons name="calendar-outline" size={20} color={C.textTertiary} />
               </TouchableOpacity>
               {showDatePicker && (
                 <DateTimePicker
@@ -379,39 +345,33 @@ export default function SignupScreen() {
               )}
 
               {/* Email */}
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-                {t.emailLabel}
-              </Text>
+              <Text style={labelStyle}>{t.emailLabel}</Text>
               <TextInput
                 value={email} onChangeText={setEmail}
-                placeholder={t.emailPH} placeholderTextColor="#9CA3AF"
+                placeholder={t.emailPH} placeholderTextColor={C.textTertiary}
                 keyboardType="email-address" autoCapitalize="none"
-                textAlign={isRTL ? "right" : "left"}
-                style={{
-                  backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-                  borderRadius: 12, padding: 14, fontSize: 15, color: "#111827", marginBottom: 16,
-                }}
+                textAlign={isRTL ? "right" : "left"} style={inputStyle}
               />
 
               {/* Mot de passe */}
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-                {t.password}
-              </Text>
+              <Text style={labelStyle}>{t.password}</Text>
               <View style={{ position: "relative", marginBottom: 8 }}>
                 <TextInput
                   value={password} onChangeText={setPassword}
-                  placeholder="••••••••" placeholderTextColor="#9CA3AF"
+                  placeholder="••••••••" placeholderTextColor={C.textTertiary}
                   secureTextEntry={!showPassword} textAlign={isRTL ? "right" : "left"}
                   style={{
-                    backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB",
-                    borderRadius: 12, padding: 14, paddingRight: 48, fontSize: 15, color: "#111827",
+                    backgroundColor: C.card,
+                    borderWidth: 1, borderColor: C.borderMedium,
+                    borderRadius: 12, padding: 14, paddingRight: 48,
+                    fontSize: 15, color: C.text,
                   }}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={{ position: "absolute", right: 14, top: 14 }}
                 >
-                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#9CA3AF" />
+                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color={C.textTertiary} />
                 </TouchableOpacity>
               </View>
 
@@ -422,7 +382,7 @@ export default function SignupScreen() {
                     {[0, 1, 2, 3].map((i) => (
                       <View key={i} style={{
                         flex: 1, height: 4, borderRadius: 2,
-                        backgroundColor: i < strength.score ? strength.color : "#E5E7EB",
+                        backgroundColor: i < strength.score ? strength.color : C.borderMedium,
                       }} />
                     ))}
                   </View>
@@ -433,22 +393,21 @@ export default function SignupScreen() {
               )}
 
               {/* Confirmer mot de passe */}
-              <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151", marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
-                {t.confirm}
-              </Text>
+              <Text style={labelStyle}>{t.confirm}</Text>
               <TextInput
                 value={confirm} onChangeText={setConfirm}
-                placeholder="••••••••" placeholderTextColor="#9CA3AF"
+                placeholder="••••••••" placeholderTextColor={C.textTertiary}
                 secureTextEntry textAlign={isRTL ? "right" : "left"}
                 style={{
-                  backgroundColor: "#FFFFFF", borderWidth: 1,
-                  borderColor: confirm.length > 0 && confirm !== password ? "#EF4444" : "#E5E7EB",
-                  borderRadius: 12, padding: 14, fontSize: 15, color: "#111827",
+                  backgroundColor: C.card,
+                  borderWidth: 1,
+                  borderColor: confirm.length > 0 && confirm !== password ? C.danger : C.borderMedium,
+                  borderRadius: 12, padding: 14, fontSize: 15, color: C.text,
                   marginBottom: confirm.length > 0 && confirm !== password ? 4 : 28,
                 }}
               />
               {confirm.length > 0 && confirm !== password && (
-                <Text style={{ fontSize: 12, color: "#EF4444", marginBottom: 24, textAlign: isRTL ? "right" : "left" }}>
+                <Text style={{ fontSize: 12, color: C.danger, marginBottom: 24, textAlign: isRTL ? "right" : "left" }}>
                   {t.passwordMismatch}
                 </Text>
               )}
@@ -457,7 +416,7 @@ export default function SignupScreen() {
               <TouchableOpacity
                 onPress={handleSignup} disabled={isLoading}
                 style={{
-                  backgroundColor: isLoading ? "#A5B4FC" : "#6366F1",
+                  backgroundColor: isLoading ? (isDark ? "#3730A3" : "#A5B4FC") : C.primary,
                   borderRadius: 14, padding: 16, alignItems: "center",
                   elevation: 4, marginBottom: 16,
                 }}
@@ -469,16 +428,14 @@ export default function SignupScreen() {
                 )}
               </TouchableOpacity>
 
-              
-
               {/* Lien login */}
               <TouchableOpacity
                 onPress={() => router.back()}
                 style={{ alignItems: "center", padding: 8, marginTop: 16 }}
               >
-                <Text style={{ fontSize: 14, color: "#6B7280" }}>
+                <Text style={{ fontSize: 14, color: C.textSecondary }}>
                   {t.alreadyAccount}
-                  <Text style={{ color: "#6366F1", fontWeight: "600" }}>{t.signIn}</Text>
+                  <Text style={{ color: C.primary, fontWeight: "600" }}>{t.signIn}</Text>
                 </Text>
               </TouchableOpacity>
             </View>
@@ -492,39 +449,43 @@ export default function SignupScreen() {
         onRequestClose={() => setShowLangModal(false)}
       >
         <TouchableOpacity
-          style={{ flex: 1, backgroundColor: "#00000050" }}
+          style={{ flex: 1, backgroundColor: C.overlay }}
           onPress={() => setShowLangModal(false)} activeOpacity={1}
         >
           <View style={{
             position: "absolute", bottom: 0, left: 0, right: 0,
-            backgroundColor: "#FFFFFF", borderTopLeftRadius: 20,
-            borderTopRightRadius: 20, padding: 24, paddingBottom: 40,
+            backgroundColor: C.card,
+            borderTopLeftRadius: 20, borderTopRightRadius: 20,
+            padding: 24, paddingBottom: 40,
           }}>
-            <Text style={{ fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: C.text, marginBottom: 20 }}>
               {t.selectLang}
             </Text>
             {LANGUAGES.map((lang) => (
               <TouchableOpacity
                 key={lang.code} onPress={() => handleLanguageChange(lang.code)}
                 style={{
-                  flexDirection: "row", alignItems: "center", padding: 16,
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center", padding: 16,
                   borderRadius: 12, marginBottom: 8,
-                  backgroundColor: currentLanguage === lang.code ? "#EEF2FF" : "#F8F9FA",
+                  backgroundColor: currentLanguage === lang.code ? C.primaryLight : C.background,
                   borderWidth: 1.5,
-                  borderColor: currentLanguage === lang.code ? "#6366F1" : "transparent",
+                  borderColor: currentLanguage === lang.code ? C.primary : "transparent",
                 }}
               >
-                <Text style={{ fontSize: 28, marginRight: 14 }}>{lang.flag}</Text>
+                <Text style={{ fontSize: 28, marginRight: isRTL ? 0 : 14, marginLeft: isRTL ? 14 : 0 }}>
+                  {lang.flag}
+                </Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "600", color: "#111827" }}>
+                  <Text style={{ fontSize: 15, fontWeight: "600", color: C.text, textAlign: isRTL ? "right" : "left" }}>
                     {lang.nativeLabel}
                   </Text>
-                  <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+                  <Text style={{ fontSize: 13, color: C.textSecondary, marginTop: 2, textAlign: isRTL ? "right" : "left" }}>
                     {lang.label}
                   </Text>
                 </View>
                 {currentLanguage === lang.code && (
-                  <Ionicons name="checkmark-circle" size={22} color="#6366F1" />
+                  <Ionicons name="checkmark-circle" size={22} color={C.primary} />
                 )}
               </TouchableOpacity>
             ))}

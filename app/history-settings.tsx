@@ -7,9 +7,13 @@ import { router } from "expo-router";
 import { useLanguageStore } from "../store/languageStore";
 import { useDeleteHistory, HistoryType } from "../hooks/useDeleteHistory";
 import { useHistoryStore } from "../store/historyStore";
+import { useThemeStore } from "../store/themeStore";
+import { Colors } from "../constants/colors";
 
 export default function HistorySettingsScreen() {
   const { currentLanguage } = useLanguageStore();
+  const { isDark } = useThemeStore();
+  const C = isDark ? Colors.dark : Colors.light;
   const isRTL = currentLanguage === "ar";
   const { confirmDeleteAll } = useDeleteHistory();
   const { triggerRefresh } = useHistoryStore();
@@ -28,7 +32,7 @@ export default function HistorySettingsScreen() {
   ];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
         {/* Header */}
@@ -41,9 +45,9 @@ export default function HistorySettingsScreen() {
               onPress={() => router.back()}
               style={{ marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }}
             >
-              <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color="#374151" />
+              <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={C.text} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827" }}>
+            <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>
               🕒 {getLabel("Historique & Sauvegardes", "History & Saved", "السجل والمحفوظات")}
             </Text>
           </View>
@@ -54,13 +58,14 @@ export default function HistorySettingsScreen() {
             style={{
               flexDirection: isRTL ? "row-reverse" : "row",
               alignItems: "center", gap: 10,
-              backgroundColor: "#F3F4F6", borderRadius: 12,
-              padding: 12, borderWidth: 1, borderColor: "#E5E7EB",
+              backgroundColor: isDark ? C.card : "#F3F4F6",
+              borderRadius: 12, padding: 12,
+              borderWidth: 1, borderColor: C.borderMedium,
             }}
           >
-            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={18} color={C.textTertiary} />
             <Text style={{
-              fontSize: 14, color: "#9CA3AF", flex: 1,
+              fontSize: 14, color: C.textTertiary, flex: 1,
               textAlign: isRTL ? "right" : "left",
             }}>
               {getLabel(
@@ -69,18 +74,24 @@ export default function HistorySettingsScreen() {
                 "بحث في السجل..."
               )}
             </Text>
-            <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#D1D5DB" />
+            <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color={C.borderMedium} />
           </TouchableOpacity>
         </View>
 
-        {/* Info */}
+        {/* Info danger */}
         <View style={{
-          backgroundColor: "#FEF2F2", borderRadius: 12, padding: 14,
-          marginBottom: 20, borderWidth: 1, borderColor: "#FECACA",
-          flexDirection: isRTL ? "row-reverse" : "row", gap: 10, alignItems: "flex-start",
+          backgroundColor: isDark ? "#2D0A0A" : "#FEF2F2",
+          borderRadius: 12, padding: 14, marginBottom: 20,
+          borderWidth: 1, borderColor: isDark ? "#7F1D1D" : "#FECACA",
+          flexDirection: isRTL ? "row-reverse" : "row",
+          gap: 10, alignItems: "flex-start",
         }}>
-          <Ionicons name="warning-outline" size={18} color="#EF4444" style={{ marginTop: 1 }} />
-          <Text style={{ flex: 1, fontSize: 13, color: "#991B1B", lineHeight: 20, textAlign: isRTL ? "right" : "left" }}>
+          <Ionicons name="warning-outline" size={18} color={C.danger} style={{ marginTop: 1 }} />
+          <Text style={{
+            flex: 1, fontSize: 13,
+            color: isDark ? "#FCA5A5" : "#991B1B",
+            lineHeight: 20, textAlign: isRTL ? "right" : "left",
+          }}>
             {getLabel(
               "La suppression est irréversible. Toutes les données de la catégorie seront définitivement effacées.",
               "Deletion is irreversible. All data in the category will be permanently deleted.",
@@ -91,8 +102,8 @@ export default function HistorySettingsScreen() {
 
         {/* Liste */}
         <View style={{
-          backgroundColor: "#FFFFFF", borderRadius: 14,
-          borderWidth: 1, borderColor: "#F3F4F6", overflow: "hidden",
+          backgroundColor: C.card, borderRadius: 14,
+          borderWidth: 1, borderColor: C.border, overflow: "hidden",
         }}>
           {HISTORY_ITEMS.map(({ type, labelFr, labelEn, labelAr, icon }, index, arr) => {
             const label = getLabel(labelFr, labelEn, labelAr);
@@ -103,29 +114,35 @@ export default function HistorySettingsScreen() {
                   flexDirection: isRTL ? "row-reverse" : "row",
                   alignItems: "center", padding: 14,
                   borderBottomWidth: index < arr.length - 1 ? 1 : 0,
-                  borderBottomColor: "#F3F4F6",
+                  borderBottomColor: C.border,
                 }}
               >
                 <View style={{
                   width: 36, height: 36, borderRadius: 10,
-                  backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center",
+                  backgroundColor: isDark ? "#1E293B" : "#F3F4F6",
+                  alignItems: "center", justifyContent: "center",
                   marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0,
                 }}>
                   <Text style={{ fontSize: 16 }}>{icon}</Text>
                 </View>
-                <Text style={{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "500", textAlign: isRTL ? "right" : "left" }}>
+                <Text style={{
+                  flex: 1, fontSize: 14, color: C.text,
+                  fontWeight: "500", textAlign: isRTL ? "right" : "left",
+                }}>
                   {label}
                 </Text>
                 <TouchableOpacity
                   onPress={() => confirmDeleteAll(type, label, currentLanguage, () => triggerRefresh(type))}
                   style={{
-                    backgroundColor: "#FEF2F2", paddingHorizontal: 10, paddingVertical: 6,
-                    borderRadius: 8, borderWidth: 1, borderColor: "#FECACA",
+                    backgroundColor: isDark ? "#2D0A0A" : "#FEF2F2",
+                    paddingHorizontal: 10, paddingVertical: 6,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: isDark ? "#7F1D1D" : "#FECACA",
                   }}
                 >
-                  <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "600" }}>
+                  <Text style={{ fontSize: 12, color: C.danger, fontWeight: "600" }}>
                     {getLabel("Effacer", "Clear", "حذف")}
-                    
                   </Text>
                 </TouchableOpacity>
               </View>
