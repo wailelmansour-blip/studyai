@@ -30,6 +30,7 @@ import { useHistoryStore } from "../store/historyStore";
 import { useStreakStore } from "../store/streakStore";
 import { useThemeStore } from "../store/themeStore";
 import { Colors } from "../constants/colors";
+import { useLocalSearchParams } from "expo-router";
 
 const CACHE_KEY = "studyai_explanations";
 const MAX_CACHE_ITEMS = 10;
@@ -68,6 +69,7 @@ export default function ExplainScreen() {
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { loadId } = useLocalSearchParams<{ loadId?: string }>();
 
   const difficultyColors: Record<string, string> = {
     facile: "#10B981", moyen: "#F59E0B", difficile: "#EF4444",
@@ -109,6 +111,13 @@ export default function ExplainScreen() {
     };
     loadCache();
   }, [refreshTrigger]);
+
+  useEffect(() => {
+  if (loadId && cachedExplanations.length > 0) {
+    const item = cachedExplanations.find((e) => e.id === loadId);
+    if (item) handleLoadFromHistory(item);
+  }
+}, [loadId, cachedExplanations]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

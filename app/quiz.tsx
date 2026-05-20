@@ -29,6 +29,7 @@ import { useFocusEffect } from "expo-router";
 import { useStreakStore } from "../store/streakStore";
 import { useThemeStore } from "../store/themeStore";
 import { Colors } from "../constants/colors";
+import { useLocalSearchParams } from "expo-router";
 
 const CACHE_KEY = "studyai_quizzes";
 const MAX_CACHE_ITEMS = 10;
@@ -81,6 +82,7 @@ export default function QuizScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const { addPoints } = useStreakStore();
+  const { loadId } = useLocalSearchParams<{ loadId?: string }>();
 
   useEffect(() => { trackView(); }, []);
 
@@ -113,6 +115,13 @@ export default function QuizScreen() {
       loadCache();
     }, [refreshTrigger])
   );
+
+useEffect(() => {
+  if (loadId && cachedQuizzes.length > 0) {
+    const item = cachedQuizzes.find((q) => q.id === loadId);
+    if (item) handleReplay(item);
+  }
+}, [loadId, cachedQuizzes]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

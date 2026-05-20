@@ -30,6 +30,7 @@ import { useFocusEffect } from "expo-router";
 import { useStreakStore } from "../store/streakStore";
 import { useThemeStore } from "../store/themeStore";
 import { Colors } from "../constants/colors";
+import { useLocalSearchParams } from "expo-router";
 
 const CACHE_KEY = "studyai_chatSessions";
 const PAGE_SIZE = 5;
@@ -96,6 +97,7 @@ export default function ChatScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const { loadId } = useLocalSearchParams<{ loadId?: string }>();
 
   useEffect(() => { trackView(); }, []);
 
@@ -129,6 +131,13 @@ export default function ChatScreen() {
   useEffect(() => {
     setTimeout(() => { scrollRef.current?.scrollToEnd({ animated: true }); }, 100);
   }, [messages, isTyping]);
+
+  useEffect(() => {
+  if (loadId && cachedSessions.length > 0) {
+    const item = cachedSessions.find((s) => s.id === loadId);
+    if (item) handleResumeSession(item);
+  }
+}, [loadId, cachedSessions]);
 
   const getWelcomeMessage = (course: string) => {
     if (currentLanguage === "ar") return `مرحباً! أنا مساعدك لمادة ${course}.\nاطرح عليّ أي سؤال حول هذه المادة وسأبذل قصارى جهدي لمساعدتك. 📚`;

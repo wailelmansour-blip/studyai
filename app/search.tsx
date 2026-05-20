@@ -169,18 +169,33 @@ export default function SearchScreen() {
     return acc;
   }, {} as Record<string, SearchResult[]>);
 
-  const getRouteForType = (type: string): string => {
-    switch (type) {
-      case "quiz":        return "/quiz";
-      case "summary":     return "/summary";
-      case "flashcard":   return "/flashcards";
-      case "plan":        return "/plan";
-      case "explanation": return "/explain";
-      case "solution":    return "/solve";
-      case "chat":        return "/chat";
-      default:            return "/";
-    }
-  };
+  const handleResultPress = (item: SearchResult) => {
+  switch (item.type) {
+    case "quiz":
+      router.push({ pathname: "/quiz", params: { loadId: item.id } } as any);
+      break;
+    case "summary":
+      router.push({ pathname: "/summary", params: { loadId: item.id } } as any);
+      break;
+    case "flashcard":
+      router.push({ pathname: "/flashcards", params: { loadId: item.id } } as any);
+      break;
+    case "plan":
+      router.push({ pathname: "/plan", params: { loadId: item.id } } as any);
+      break;
+    case "explanation":
+      router.push({ pathname: "/explain", params: { loadId: item.id } } as any);
+      break;
+    case "solution":
+      router.push({ pathname: "/solve", params: { loadId: item.id } } as any);
+      break;
+    case "chat":
+      router.push({ pathname: "/chat", params: { loadId: item.id } } as any);
+      break;
+    default:
+      router.push("/" as any);
+  }
+};
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
@@ -349,7 +364,7 @@ export default function SearchScreen() {
                     {items.map((item, index) => (
                       <TouchableOpacity
                         key={item.id}
-                        onPress={() => router.push(getRouteForType(item.type) as any)}
+                        onPress={() => handleResultPress(item)}
                         style={{
                           flexDirection: isRTL ? "row-reverse" : "row",
                           alignItems: "center", padding: 14,

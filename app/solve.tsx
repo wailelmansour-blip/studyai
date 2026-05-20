@@ -31,6 +31,7 @@ import { useHistoryStore } from "../store/historyStore";
 import { useStreakStore } from "../store/streakStore";
 import { useThemeStore } from "../store/themeStore";
 import { Colors } from "../constants/colors";
+import { useLocalSearchParams } from "expo-router";
 
 const CACHE_KEY = "studyai_solutions";
 const MAX_CACHE_ITEMS = 10;
@@ -68,6 +69,7 @@ export default function SolveScreen() {
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { loadId } = useLocalSearchParams<{ loadId?: string }>();
 
   useEffect(() => {
     trackView();
@@ -99,6 +101,13 @@ export default function SolveScreen() {
     };
     loadCache();
   }, [refreshTrigger]);
+
+  useEffect(() => {
+  if (loadId && cachedSolutions.length > 0) {
+    const item = cachedSolutions.find((s) => s.id === loadId);
+    if (item) handleLoadFromHistory(item);
+  }
+}, [loadId, cachedSolutions]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

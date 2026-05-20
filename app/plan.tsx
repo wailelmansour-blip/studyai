@@ -32,6 +32,7 @@ import { useFocusEffect } from "expo-router";
 import { useStreakStore } from "../store/streakStore";
 import { useThemeStore } from "../store/themeStore";
 import { Colors } from "../constants/colors";
+import { useLocalSearchParams } from "expo-router";
 
 const CACHE_KEY = "studyai_plans";
 const MAX_CACHE_ITEMS = 10;
@@ -72,6 +73,7 @@ export default function PlanScreen() {
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { loadId } = useLocalSearchParams<{ loadId?: string }>();
 
   useEffect(() => { trackView(); }, []);
 
@@ -103,6 +105,13 @@ export default function PlanScreen() {
     };
     loadCache();
   }, [refreshTrigger]));
+
+  useEffect(() => {
+  if (loadId && cachedPlans.length > 0) {
+    const item = cachedPlans.find((p) => p.id === loadId);
+    if (item) handleLoadFromHistory(item);
+  }
+}, [loadId, cachedPlans]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

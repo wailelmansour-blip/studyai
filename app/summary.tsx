@@ -30,6 +30,7 @@ import * as Clipboard from "expo-clipboard";
 import { useStreakStore } from "../store/streakStore";
 import { useThemeStore } from "../store/themeStore";
 import { Colors } from "../constants/colors";
+import { useLocalSearchParams } from "expo-router";
 
 const CACHE_KEY = "studyai_summaries";
 const MAX_CACHE_ITEMS = 10;
@@ -66,6 +67,7 @@ export default function SummaryScreen() {
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { loadId } = useLocalSearchParams<{ loadId?: string }>();
 
   useEffect(() => {
     trackView();
@@ -96,6 +98,13 @@ export default function SummaryScreen() {
     };
     loadCache();
   }, [refreshTrigger]);
+
+  useEffect(() => {
+  if (loadId && cachedSummaries.length > 0) {
+    const item = cachedSummaries.find((s) => s.id === loadId);
+    if (item) handleLoadFromCache(item);
+  }
+}, [loadId, cachedSummaries]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;

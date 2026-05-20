@@ -29,6 +29,7 @@ import { useHistoryStore } from "../store/historyStore";
 import { useStreakStore } from "../store/streakStore";
 import { useThemeStore } from "../store/themeStore";
 import { Colors } from "../constants/colors";
+import { useLocalSearchParams } from "expo-router";
 
 const CACHE_KEY = "studyai_flashcards";
 const MAX_CACHE_ITEMS = 10;
@@ -69,6 +70,7 @@ export default function FlashcardsScreen() {
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { loadId } = useLocalSearchParams<{ loadId?: string }>();
 
   useEffect(() => {
     trackView();
@@ -97,6 +99,13 @@ export default function FlashcardsScreen() {
     };
     loadCache();
   }, [refreshTrigger]);
+
+  useEffect(() => {
+  if (loadId && cachedFlashcards.length > 0) {
+    const item = cachedFlashcards.find((f) => f.id === loadId);
+    if (item) handleLoadFromHistory(item);
+  }
+}, [loadId, cachedFlashcards]);
 
   const handleLoadMore = async () => {
     if (!lastDoc || loadingMore) return;
