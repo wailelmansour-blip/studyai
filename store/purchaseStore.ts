@@ -2,8 +2,13 @@
 import { create } from "zustand";
 import Purchases, { PurchasesPackage, CustomerInfo } from "react-native-purchases";
 import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
-const REVENUECAT_GOOGLE_API_KEY = "goog_BcAOmQYmDZcpUesYAOYDzfOZKOM";
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+const REVENUECAT_GOOGLE_API_KEY = isExpoGo
+  ? "test_MPLTKioTsIsQJyvYIoJkGweWvoW"
+  : "goog_BcAOmQYmDZcpUesYAOYDzfOZKOM";
 
 interface PurchaseStore {
   isInitialized: boolean;
