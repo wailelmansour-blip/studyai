@@ -14,6 +14,7 @@ import { OfflineBanner } from "../components/OfflineBanner";
 import { useOnboardingStore } from "../store/onboardingStore";
 import { useThemeStore } from "../store/themeStore";
 import { Colors } from "../constants/colors";
+import { usePurchaseStore } from "../store/purchaseStore";
 
 LogBox.ignoreLogs([
   "Do not call Hooks inside useEffect",
@@ -55,6 +56,8 @@ export default function RootLayout() {
       loadUsage();
       loadSettings(currentLanguage);
       trackConversion("signup").catch(() => {});
+      // Initialiser RevenueCat
+    usePurchaseStore.getState().initialize(user.uid);
     }
   }, [user]);
 
